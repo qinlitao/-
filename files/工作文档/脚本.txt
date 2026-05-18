@@ -1,0 +1,983 @@
+// ==UserScript==
+// @name         xx云轻量应用服务器自动抢购（安全版）
+// @namespace    http://tampermonkey.net/
+// @version      15.0
+// @description  到点自动抢购"轻量应用服务器"，弹框自动点击立即购买
+// @author       仅供自己使用，切勿传播！！！
+// @match        https://cloud.tencent.com/act/pro/*
+// @connect      159.75.49.253
+// @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_deleteValue
+// @run-at       document-end
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // === 抢购时间配置 ===
+    const targetTimes = [
+        { hour: 10, minute: 0, second: 0 },  // 早上10点
+        { hour: 15, minute: 0, second: 0 }   // 下午15点
+    ];
+
+    // 接口配置
+    const cfg = {};
+
+    // === 状态管理 ===
+    let statusBar = null;
+    let messageTimeout = null;
+    let sniperTimeout = null;
+    let countdownInterval = null;
+
+    // 配置项
+    cfg.a = [1,5,9];
+    cfg.b = [7,5];
+    cfg.c = [4,9];
+    cfg.d = [2,5,3];
+    cfg.e = [2,0,0,7];
+
+    // === 工具函数 ===
+
+    // 网络请求配置
+    function getVerifyApiUrl() {
+        return [
+            String.fromCharCode(104,116,116,112),
+            String.fromCharCode(58,47,47),
+            cfg.a.join(''),'.',cfg.b.join(''),'.',cfg.c.join(''),'.',cfg.d.join(''),
+            ':',cfg.e.join(''),
+            '/腾讯云验证/verify.php'
+        ].join('');
+    }
+
+    // 获取最近的抢购时间
+    function getNextTargetTime() {
+        const now = new Date();
+        let minDiff = Infinity;
+        let nextTarget = null;
+
+        for (const time of targetTimes) {
+            const target = new Date();
+            target.setHours(time.hour, time.minute, time.second, 0);
+
+            if (target < now) {
+                target.setDate(target.getDate() + 1);
+            }
+
+            const diff = target - now;
+            if (diff < minDiff) {
+                minDiff = diff;
+                nextTarget = target;
+            }
+        }
+
+        return { time: nextTarget, diff: minDiff };
+    }
+
+    // 格式化时间
+    function formatTime(diff) {
+        const totalSeconds = Math.floor(diff / 1000);
+
+        if (totalSeconds <= 60) {
+            return `${totalSeconds}秒`;
+        }
+
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if (hours > 0) {
+            return `${hours}小时${minutes}分钟${seconds}秒`;
+        } else {
+            return `${minutes}分钟${seconds}秒`;
+        }
+    }
+
+    // 创建状态栏
+    function createStatusBar() {
+        // 创建主容器
+        const bar = document.createElement('div');
+        bar.id = 'sniper-status-window';
+        bar.style.cssText = `
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            width: 260px;
+            background-color: white;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            z-index: 999999;
+            padding: 12px;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            transition: none;
+            cursor: move;
+        `;
+
+        // 标题容器
+        const titleContainer = document.createElement('div');
+        titleContainer.style.cssText = `
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        `;
+
+        // 标题
+        const title = document.createElement('h3');
+        title.textContent = '抢购助手状态';
+        title.style.cssText = `
+            margin: 0;
+            font-size: 15px;
+            font-weight: bold;
+            color: #333;
+        `;
+
+        // 退出按钮容器
+        const exitButtonContainer = document.createElement('div');
+        exitButtonContainer.id = 'sniper-exit-button-container';
+
+        // 组装标题容器
+        titleContainer.appendChild(title);
+        titleContainer.appendChild(exitButtonContainer);
+
+        // 状态列表
+        const statusList = document.createElement('div');
+        statusList.id = 'sniper-status-list';
+        statusList.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        `;
+
+        // 状态项
+        const statusItems = [
+            { key: '脚本状态', value: '运行中' },
+            { key: '服务器连接', value: '未连接' },
+            { key: '卡密验证', value: '待验证' },
+            { key: '抢购状态', value: '等待中' },
+            { key: '下次抢购', value: '计算中' }
+        ];
+
+        statusItems.forEach(item => {
+                const statusItem = document.createElement('div');
+                statusItem.id = `sniper-status-${item.key}`;
+                statusItem.style.cssText = `
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                `;
+
+                const label = document.createElement('span');
+                label.textContent = item.key + ':';
+                label.style.cssText = `
+                    color: #666;
+                    white-space: nowrap;
+                    font-size: 13px;
+                `;
+
+                const valueContainer = document.createElement('div');
+                valueContainer.style.cssText = `
+                    flex: 1;
+                    text-align: right;
+                    margin-left: 8px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                `;
+
+                const valueElement = document.createElement('span');
+                valueElement.textContent = item.value;
+                valueElement.style.cssText = `
+                    font-weight: bold;
+                    color: #333;
+                    font-size: 13px;
+                `;
+
+                valueContainer.appendChild(valueElement);
+                statusItem.appendChild(label);
+                statusItem.appendChild(valueContainer);
+                statusList.appendChild(statusItem);
+            });
+
+        // 提示项（默认隐藏）
+        const messageItem = document.createElement('div');
+        messageItem.id = 'sniper-status-提示';
+        messageItem.style.cssText = `
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin-top: 10px;
+            background-color: #f0f9ff;
+            border-radius: 4px;
+            border-left: 4px solid #1890ff;
+            display: none;
+            overflow: hidden;
+        `;
+
+        const messageLabel = document.createElement('span');
+        messageLabel.textContent = '提示:';
+        messageLabel.style.cssText = `
+            color: #1890ff;
+            font-weight: bold;
+            white-space: nowrap;
+            margin-right: 8px;
+            font-size: 13px;
+        `;
+
+        const messageContainer = document.createElement('div');
+        messageContainer.style.cssText = `
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        `;
+
+        const messageValue = document.createElement('span');
+        messageValue.id = 'sniper-message-value';
+        messageValue.style.cssText = `
+            font-weight: bold;
+            color: #1890ff;
+            white-space: nowrap;
+            display: inline-block;
+            font-size: 13px;
+        `;
+
+        messageContainer.appendChild(messageValue);
+        messageItem.appendChild(messageLabel);
+        messageItem.appendChild(messageContainer);
+        statusList.appendChild(messageItem);
+
+        // 组装
+        bar.appendChild(titleContainer);
+        bar.appendChild(statusList);
+        document.body.appendChild(bar);
+
+        // 添加拖动功能
+        let isDragging = false;
+        let startX, startY, offsetX, offsetY;
+
+        function handleMouseDown(e) {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            offsetX = bar.offsetLeft;
+            offsetY = bar.offsetTop;
+            bar.style.transition = 'none';
+            document.body.style.userSelect = 'none';
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            bar.style.left = (offsetX + dx) + 'px';
+            bar.style.top = (offsetY + dy) + 'px';
+            bar.style.right = 'auto';
+        }
+
+        function handleMouseUp() {
+            if (isDragging) {
+                isDragging = false;
+                bar.style.transition = 'all 0.3s ease';
+                document.body.style.userSelect = '';
+            }
+        }
+
+        // 绑定事件监听器
+        bar.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        // 添加清理方法到bar元素
+        bar._cleanup = function() {
+            bar.removeEventListener('mousedown', handleMouseDown);
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        return bar;
+    }
+
+    // 更新状态显示
+    function updateStatus(key, value, isError = false) {
+        let statusWindow = document.getElementById('sniper-status-window');
+        if (!statusWindow) {
+            return;
+        }
+
+        let statusList = document.getElementById('sniper-status-list');
+        let statusItem = document.getElementById(`sniper-status-${key}`);
+
+        if (!statusItem) {
+            statusItem = document.createElement('div');
+            statusItem.id = `sniper-status-${key}`;
+            statusItem.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            `;
+
+            const label = document.createElement('span');
+            label.textContent = key + ':';
+            label.style.cssText = `
+                color: #666;
+                white-space: nowrap;
+                font-size: 13px;
+            `;
+
+            const valueContainer = document.createElement('div');
+            valueContainer.style.cssText = `
+                flex: 1;
+                text-align: right;
+                margin-left: 8px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            `;
+
+            const valueElement = document.createElement('span');
+            valueElement.textContent = value;
+            valueElement.style.cssText = `
+                font-weight: bold;
+                color: #333;
+                font-size: 13px;
+            `;
+
+            valueContainer.appendChild(valueElement);
+            statusItem.appendChild(label);
+            statusItem.appendChild(valueContainer);
+            statusList.appendChild(statusItem);
+        } else {
+            const valueElement = statusItem.querySelector('span:last-child') || statusItem.querySelector('div span');
+            if (valueElement) {
+                valueElement.textContent = value;
+                valueElement.style.color = isError ? '#ff4d4f' : '#333';
+            }
+        }
+    }
+
+    // 显示提示
+    function showNotification(message, isError = false) {
+        const messageItem = document.getElementById('sniper-status-提示');
+        const messageValue = document.getElementById('sniper-message-value');
+        const messageContainer = messageValue ? messageValue.parentElement : null;
+
+        if (messageItem && messageValue && messageContainer) {
+            // 重置样式
+            messageValue.style.animation = 'none';
+            messageValue.style.transform = 'translateX(0)';
+
+            // 显示提示
+            messageItem.style.display = 'flex';
+            messageValue.textContent = message;
+            messageValue.style.color = isError ? '#ff4d4f' : '#1890ff';
+            messageItem.style.backgroundColor = isError ? '#fff1f0' : '#f0f9ff';
+            messageItem.style.borderLeftColor = isError ? '#ff4d4f' : '#1890ff';
+
+            // 计算宽度
+            const containerWidth = messageContainer.offsetWidth;
+            const textWidth = messageValue.offsetWidth;
+
+            // 长消息滚动效果
+            if (textWidth > containerWidth) {
+                // 计算滚动距离和时间
+                const scrollDistance = textWidth + 20; // 额外20px确保完全滚动出视野
+                const scrollTime = Math.max(3, scrollDistance / 40); // 至少3秒，每40px/秒的速度
+
+                // 设置动画
+                messageValue.style.cssText += `
+                    animation: scroll ${scrollTime}s linear infinite;
+                    padding-right: 15px;
+                `;
+
+                // 添加或更新滚动动画
+                let styleElement = document.getElementById('sniper-scroll-style');
+                if (!styleElement) {
+                    styleElement = document.createElement('style');
+                    styleElement.id = 'sniper-scroll-style';
+                    document.head.appendChild(styleElement);
+                }
+
+                styleElement.textContent = `
+                    @keyframes scroll {
+                        0% {
+                            transform: translateX(0);
+                        }
+                        100% {
+                            transform: translateX(-100%);
+                        }
+                    }
+                `;
+            } else {
+                messageValue.style.animation = 'none';
+            }
+
+            // 消息自动消失
+            if (messageTimeout) {
+                clearTimeout(messageTimeout);
+            }
+            messageTimeout = setTimeout(() => {
+                messageItem.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    // 验证卡密并获取核心代码
+    async function verifyCard(cardKey) {
+        return new Promise((resolve) => {
+            // 构建请求URL
+            const apiUrl = getVerifyApiUrl();
+
+            // 使用油猴的GM_xmlhttpRequest来绕过混合内容限制
+            GM_xmlhttpRequest({
+                method: 'POST',
+                url: apiUrl,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                data: `card=${encodeURIComponent(cardKey)}`,
+                timeout: 10000,
+                onload: function(response) {
+                    if (response.status === 200) {
+                        try {
+                            const result = JSON.parse(response.responseText);
+
+                            if (result.status === 'success') {
+                                // 确保remaining值存在且为数字
+                                const remainingCount = parseInt(result.remaining) || 0;
+                                resolve({ success: true, core_code: result.core_code, remaining: remainingCount });
+                            } else {
+                                resolve({ success: false, message: result.message || '卡密验证失败' });
+                            }
+                        } catch (jsonError) {
+                            resolve({ success: false, message: '服务器返回数据格式错误' });
+                        }
+                    } else {
+                        resolve({ success: false, message: '服务器连接失败：HTTP ' + response.status });
+                    }
+                },
+                onerror: function() {
+                    resolve({ success: false, message: '无法连接到服务器' });
+                },
+                ontimeout: function() {
+                    resolve({ success: false, message: '服务器连接超时' });
+                }
+            });
+        });
+    }
+
+    // 执行核心抢购代码
+    function executeCoreCode(coreCode) {
+        try {
+            updateStatus('抢购状态', '执行中');
+            showNotification('开始执行抢购代码...');
+
+            // 在内存中执行核心代码
+            eval(coreCode);
+
+            updateStatus('抢购状态', '已执行');
+            showNotification('抢购代码执行成功');
+        } catch (error) {
+            updateStatus('抢购状态', '执行失败', true);
+            showNotification('核心代码执行失败：' + error.message, true);
+        }
+    }
+
+    // 从悬浮窗获取卡密
+    function getCardKey(errorMessage = '') {
+        return new Promise((resolve) => {
+            // 创建悬浮窗（非全屏）
+            const dialog = document.createElement('div');
+            dialog.id = 'sniper-card-input';
+            dialog.style.cssText = `
+                position: fixed;
+                top: 60px;
+                right: 20px;
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+                width: 280px;
+                z-index: 999999;
+                font-family: Arial, sans-serif;
+                cursor: move;
+                border: 1px solid #e8e8e8;
+            `;
+
+            // 标题
+            const title = document.createElement('h3');
+            title.textContent = '卡密验证';
+            title.style.cssText = `
+                margin-top: 0;
+                margin-bottom: 16px;
+                font-size: 16px;
+                font-weight: bold;
+                color: #333;
+                text-align: center;
+                cursor: default;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #f0f0f0;
+            `;
+
+            // 输入框
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = '请输入卡密';
+            input.style.cssText = `
+                width: 100%;
+                padding: 10px 14px;
+                font-size: 14px;
+                border: 1px solid #d9d9d9;
+                border-radius: 6px;
+                margin-bottom: 14px;
+                box-sizing: border-box;
+                cursor: text;
+                transition: all 0.3s ease;
+                background-color: #fafafa;
+            `;
+
+            // 错误提示
+            const errorMsg = document.createElement('div');
+            errorMsg.id = 'sniper-card-error';
+            errorMsg.style.cssText = `
+                color: #ff4d4f;
+                font-size: 12px;
+                margin-bottom: 10px;
+                display: ${errorMessage ? 'block' : 'none'};
+                padding: 6px 10px;
+                background-color: #fff1f0;
+                border-radius: 4px;
+                border-left: 3px solid #ff4d4f;
+            `;
+            errorMsg.textContent = errorMessage;
+
+            // 按钮容器
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            `;
+
+            // 主要按钮行
+            const mainButtonRow = document.createElement('div');
+            mainButtonRow.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                gap: 10px;
+            `;
+
+            // 取消按钮
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = '取消';
+            cancelBtn.style.cssText = `
+                flex: 1;
+                padding: 8px 16px;
+                border: 1px solid #d9d9d9;
+                border-radius: 6px;
+                background-color: white;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            `;
+
+            // 确认按钮
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = '确认';
+            confirmBtn.style.cssText = `
+                flex: 1;
+                padding: 8px 16px;
+                border: 1px solid #1890ff;
+                border-radius: 6px;
+                background-color: #1890ff;
+                color: white;
+                cursor: pointer;
+                font-size: 13px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            `;
+
+            // 教程按钮
+            const tutorialBtn = document.createElement('button');
+            tutorialBtn.textContent = '使用教程';
+            tutorialBtn.style.cssText = `
+                width: 100%;
+                padding: 6px 12px;
+                border: 1px solid #52c41a;
+                border-radius: 6px;
+                background-color: #f6ffed;
+                color: #52c41a;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            `;
+
+            // 取消按钮点击事件
+            cancelBtn.addEventListener('click', () => {
+                document.body.removeChild(dialog);
+                resolve(null);
+            });
+
+            // 确认按钮点击事件
+            confirmBtn.addEventListener('click', () => {
+                const cardKey = input.value.trim();
+                if (!cardKey) {
+                    errorMsg.textContent = '请输入卡密';
+                    errorMsg.style.display = 'block';
+                    return;
+                }
+                document.body.removeChild(dialog);
+                resolve(cardKey);
+            });
+
+            // 回车键事件
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const cardKey = input.value.trim();
+                    if (!cardKey) {
+                        errorMsg.textContent = '请输入卡密';
+                        errorMsg.style.display = 'block';
+                        return;
+                    }
+                    document.body.removeChild(dialog);
+                    resolve(cardKey);
+                }
+            });
+
+            // 添加拖动功能
+            let isDragging = false;
+            let startX, startY, offsetX, offsetY;
+
+            dialog.addEventListener('mousedown', (e) => {
+                // 只有点击标题区域才允许拖动
+                if (e.target === dialog || e.target === title) {
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    offsetX = dialog.offsetLeft;
+                    offsetY = dialog.offsetTop;
+                    dialog.style.transition = 'none';
+                    document.body.style.userSelect = 'none';
+                }
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                dialog.style.left = (offsetX + dx) + 'px';
+                dialog.style.top = (offsetY + dy) + 'px';
+                dialog.style.right = 'auto';
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    dialog.style.transition = 'all 0.3s ease';
+                    document.body.style.userSelect = '';
+                }
+            });
+
+            // 组装主要按钮行
+            mainButtonRow.appendChild(cancelBtn);
+            mainButtonRow.appendChild(confirmBtn);
+
+            // 组装按钮容器
+            buttonContainer.appendChild(mainButtonRow);
+            buttonContainer.appendChild(tutorialBtn);
+
+            // 组装悬浮窗
+            dialog.appendChild(title);
+            dialog.appendChild(input);
+            dialog.appendChild(errorMsg);
+            dialog.appendChild(buttonContainer);
+
+            // 教程按钮点击事件
+            tutorialBtn.addEventListener('click', () => {
+                // 创建教程弹窗
+                const tutorialDialog = document.createElement('div');
+                tutorialDialog.id = 'sniper-tutorial-dialog';
+                tutorialDialog.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background-color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    width: 320px;
+                    max-width: 90%;
+                    z-index: 9999999;
+                    font-family: Arial, sans-serif;
+                `;
+
+                // 教程标题
+                const tutorialTitle = document.createElement('h3');
+                tutorialTitle.textContent = '使用教程';
+                tutorialTitle.style.cssText = `
+                    margin-top: 0;
+                    margin-bottom: 15px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    color: #333;
+                    text-align: center;
+                `;
+
+                // 教程内容
+                const tutorialContent = document.createElement('div');
+                tutorialContent.style.cssText = `
+                    font-size: 13px;
+                    line-height: 1.5;
+                    margin-bottom: 15px;
+                    color: #666;
+                    user-select: none;
+                    -webkit-user-select: none;
+                    -moz-user-select: none;
+                    -ms-user-select: none;
+                `;
+                tutorialContent.innerHTML = `
+                    <p>1. 本卡密为一次性授权，卡密验证后，刷新或关闭网页会直接导致卡密失效，全程禁止操作这两项。</p>
+                    <p>2. 请在<strong>抢购前5分钟</strong>打开活动抢购页面，输入卡密完成验证。</p>
+                    <p>3. 验证成功后，页面会显示倒计时，保持页面前台运行，不做任何操作。</p>
+                    <p>4. 时间到脚本自动执行抢购，抢购成功后自行付款即可。</p>
+                    <p>5. 卡密为一次性授权，使用后不补、不换、不退</p>
+                `;
+
+                // 关闭按钮
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '我知道了';
+                closeBtn.style.cssText = `
+                    width: 100%;
+                    padding: 8px 16px;
+                    border: 1px solid #1890ff;
+                    border-radius: 4px;
+                    background-color: #1890ff;
+                    color: white;
+                    cursor: pointer;
+                    font-size: 14px;
+                `;
+
+                // 关闭按钮点击事件
+                closeBtn.addEventListener('click', () => {
+                    document.body.removeChild(tutorialDialog);
+                });
+
+                // 组装教程弹窗
+                tutorialDialog.appendChild(tutorialTitle);
+                tutorialDialog.appendChild(tutorialContent);
+                tutorialDialog.appendChild(closeBtn);
+                document.body.appendChild(tutorialDialog);
+            });
+
+            // 添加到页面
+            document.body.appendChild(dialog);
+
+            // 自动聚焦输入框
+            input.focus();
+        });
+    }
+
+    // 计算下次抢购时间
+    function updateNextSniperTime() {
+        const { time, diff } = getNextTargetTime();
+        const formattedTime = formatTime(diff);
+        updateStatus('下次抢购', formattedTime);
+
+        return diff;
+    }
+
+    // 保存卡密
+    function saveCardKey(cardKey) {
+        GM_setValue('saved_card_key', cardKey);
+        GM_setValue('card_saved_at', Date.now());
+    }
+
+    // 获取保存的卡密
+    function getSavedCardKey() {
+        return GM_getValue('saved_card_key', null);
+    }
+
+    // 清除保存的卡密
+    function clearSavedCardKey() {
+        GM_deleteValue('saved_card_key');
+        GM_deleteValue('card_saved_at');
+    }
+
+    // 添加退出按钮到状态栏
+    function addExitButton() {
+        const statusWindow = document.getElementById('sniper-status-window');
+        if (!statusWindow) return;
+
+        // 检查是否已存在退出按钮
+        if (document.getElementById('sniper-exit-button')) return;
+
+        // 创建退出按钮
+        const exitButton = document.createElement('button');
+        exitButton.id = 'sniper-exit-button';
+        exitButton.textContent = '退出';
+        exitButton.style.cssText = `
+            padding: 4px 8px;
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            white-space: nowrap;
+        `;
+
+        // 退出按钮点击事件
+        async function handleExit() {
+            // 清除保存的卡密
+            clearSavedCardKey();
+
+            // 清除定时任务和定时器
+            if (sniperTimeout) {
+                clearTimeout(sniperTimeout);
+                sniperTimeout = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            // 更新状态
+            updateStatus('脚本状态', '已停止', true);
+            updateStatus('卡密验证', '已退出', true);
+            updateStatus('抢购状态', '已取消', true);
+            showNotification('已退出卡密并取消抢购任务', true);
+
+            // 移除事件监听器
+            exitButton.removeEventListener('click', handleExit);
+
+            // 重新启动脚本
+            setTimeout(async () => {
+                // 清除状态栏
+                const statusWindow = document.getElementById('sniper-status-window');
+                if (statusWindow) {
+                    // 清理事件监听器
+                    if (statusWindow._cleanup) {
+                        statusWindow._cleanup();
+                    }
+                    statusWindow.remove();
+                }
+
+                // 重新执行主函数
+                await main();
+            }, 1000);
+        }
+
+        exitButton.addEventListener('click', handleExit);
+
+        // 添加到标题旁边的容器
+        const exitButtonContainer = document.getElementById('sniper-exit-button-container');
+        if (exitButtonContainer) {
+            exitButtonContainer.appendChild(exitButton);
+        }
+    }
+
+    // 主函数
+    async function main() {
+        // 检查是否有保存的卡密
+        const savedCardKey = getSavedCardKey();
+        let cardKey;
+
+        if (savedCardKey) {
+            // 自动使用保存的卡密
+            cardKey = savedCardKey;
+        } else {
+            // 获取新卡密
+            cardKey = await getCardKey();
+        }
+
+        if (!cardKey) {
+            return;
+        }
+
+        // 验证卡密
+        let verificationResult = await verifyCard(cardKey);
+        let coreCode;
+        let remaining = 0;
+
+        while (!verificationResult.success) {
+            // 验证失败，清除保存的卡密
+            clearSavedCardKey();
+
+            // 清除定时任务和定时器
+            if (sniperTimeout) {
+                clearTimeout(sniperTimeout);
+                sniperTimeout = null;
+            }
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+
+            // 重新获取卡密，显示错误提示
+            cardKey = await getCardKey('卡密验证失败：' + verificationResult.message);
+            if (!cardKey) return;
+
+            // 重新验证
+            verificationResult = await verifyCard(cardKey);
+        }
+
+        // 验证成功
+        coreCode = verificationResult.core_code;
+        remaining = verificationResult.remaining;
+
+        // 保存卡密
+        saveCardKey(cardKey);
+
+        // 检查是否已经创建了状态栏
+        if (!document.getElementById('sniper-status-window')) {
+            // 创建状态栏
+            statusBar = createStatusBar();
+
+            // 初始化状态
+            updateStatus('脚本状态', '运行中');
+            updateStatus('服务器连接', '成功');
+            updateStatus('卡密验证', '成功');
+            updateStatus('抢购状态', '等待中');
+            updateStatus('下次抢购', '计算中');
+
+            // 显示启动提示
+            showNotification('卡密验证成功，准备抢购');
+
+            // 只要卡密剩余次数大于等于1次就添加退出按钮
+            if (remaining >= 1) {
+                addExitButton();
+            }
+
+            // 计算下次抢购时间
+            const msToTarget = updateNextSniperTime();
+
+            if (msToTarget > 0) {
+                showNotification(`等待抢购时间，还有 ${formatTime(msToTarget)}`);
+
+                // 每秒更新倒计时
+                countdownInterval = setInterval(updateNextSniperTime, 1000);
+
+                sniperTimeout = setTimeout(() => {
+                    clearInterval(countdownInterval);
+                    showNotification('抢购时间已到，立即执行');
+                    updateStatus('抢购状态', '执行中');
+                    executeCoreCode(coreCode);
+                    updateStatus('抢购状态', '已执行');
+                }, msToTarget);
+            } else {
+                showNotification('抢购时间已到，立即执行');
+                updateStatus('抢购状态', '执行中');
+                executeCoreCode(coreCode);
+                updateStatus('抢购状态', '已执行');
+            }
+        }
+    }
+
+    // 启动脚本
+    main();
+})();

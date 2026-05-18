@@ -1,0 +1,205 @@
+{
+  "main": {
+    "id": "e7277b69e3a44f2f",
+    "type": "split",
+    "children": [
+      {
+        "id": "f400d475f53246dc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "09b64f9d04c6a42d",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "graph-master/nodes/代餐.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "代餐"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "8635911d5ad97fd9",
+    "type": "split",
+    "children": [
+      {
+        "id": "e9fff236058cee19",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e34f91eed45575a7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "be7c9b2d9e67f112",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "68e5542ccf360bf0",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "2891690844930896",
+    "type": "split",
+    "children": [
+      {
+        "id": "a5e71dcc9ce9fb27",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9ad51b8e973835e0",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "graph-master/nodes/代餐.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "代餐 的反向链接列表"
+            }
+          },
+          {
+            "id": "006aae31c3c462bc",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "graph-master/nodes/代餐.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "代餐 的出链列表"
+            }
+          },
+          {
+            "id": "b2b6caf5536254cb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "f75c1424d9bc9843",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "e770d88d68fffbe0",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "graph-master/nodes/代餐.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "代餐 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "09b64f9d04c6a42d",
+  "lastOpenFiles": [
+    "graph-master/nodes/减肥手术.md",
+    "graph-master/nodes/奥利司他.md",
+    "graph-master/relations/02-生活方式干预-includes-同伴行动.md",
+    "索引/关系总索引.md",
+    "graph-master/relations/01-生活方式干预-includes-饮食选择.md",
+    "graph-master/relations/06-代餐-requires-生活方式干预.md",
+    "graph-master/relations/03-饮食选择-supports-能量缺口.md",
+    "来源文章/15-婴儿肥：为什么必须马上减掉？.md",
+    "graph-master/nodes/代餐.md",
+    "索引/主节点总索引.md",
+    "来源文章/03-铁证：减肥成功只有一条正路.md",
+    "来源文章/05-饮食选择：如何保证吃对又不饿？.md",
+    "来源文章/14-代餐：是神器还是忽悠？.md",
+    "来源文章/11-手术：减肥手术真的靠谱吗？.md",
+    "来源文章/09-同伴行动：“近瘦者瘦”是真的吗？.md",
+    "graph-master/nodes/反式脂肪酸.md"
+  ]
+}
