@@ -68,44 +68,58 @@ async function runCollection() {
       continue;
     }
     const key = `${src.platform || src.type}:${src.name}`;
-    const adapter = ADAPTERS[src.type];
-    if (!adapter) {
-      status.sources[key] = { ok: false, error: `未知类型 ${src.type}` };
-      status.errors.push(`${src.name}: 未知类型 ${src.type}`);
+
+    // MCP 信源：读取 agent 预先采集好的原始文件（state/mcp_*.json 由 ingest_mcp.js 产出）
+    let res;
+    if (src.collect_via === 'mcp') {
+      const rawFile = src.raw_file;
+      if (!rawFile || !fs.existsSync(path.join(STATE_DIR, rawFile))) {
+        status.sources[key] = { ok: true, skipped: true, reason: 'MCP 原始文件缺失（agent 未采集，跳过）' };
+        continue;
+      }
+      res = { items: loadJson(path.join(STATE_DIR, rawFile), []) };
+    } else {
+      const adapter = ADAPTERS[src.type];
+      if (!adapter) {
+        status.sources[key] = { ok: false, error: `未知类型 ${src.type}` };
+        status.errors.push(`${src.name}: 未知类型 ${src.type}`);
+        continue;
+      }
+      try {
+        res = await adapter.collect(src);
+      } catch (e) {
+        status.sources[key] = { ok: false, error: e.message, newCount: 0 };
+        status.errors.push(`${src.name}: ${e.message}`);
+        continue;
+      }
+    }
+
+    if (res.skipped) {
+      status.sources[key] = { ok: true, skipped: true, reason: res.reason };
       continue;
     }
-    try {
-      const res = await adapter.collect(src);
-      if (res.skipped) {
-        status.sources[key] = { ok: true, skipped: true, reason: res.reason };
-        continue;
-      }
-      if (res.sessionExpired) {
-        status.sources[key] = { ok: false, sessionExpired: true, newCount: 0 };
-        status.errors.push(`${src.name}: LinkedIn 登录态失效，需重新登录`);
-        continue;
-      }
-      if (res.error) {
-        status.sources[key] = { ok: false, error: res.error, newCount: 0 };
-        status.errors.push(`${src.name}: ${res.error}`);
-        continue;
-      }
-      const fresh = [];
-      for (const raw of res.items) {
-        const id = raw.id;
-        if (!id) continue;
-        const dedupKey = `${key}::${id}`;
-        if (seen[dedupKey]) continue;
-        seen[dedupKey] = date;
-        fresh.push(normalize(raw, src));
-      }
-      status.sources[key] = { ok: true, collected: res.items.length, newCount: fresh.length };
-      status.newTotal += fresh.length;
-      newItems.push(...fresh);
-    } catch (e) {
-      status.sources[key] = { ok: false, error: e.message, newCount: 0 };
-      status.errors.push(`${src.name}: ${e.message}`);
+    if (res.sessionExpired) {
+      status.sources[key] = { ok: false, sessionExpired: true, newCount: 0 };
+      status.errors.push(`${src.name}: LinkedIn 登录态失效，需重新登录`);
+      continue;
     }
+    if (res.error) {
+      status.sources[key] = { ok: false, error: res.error, newCount: 0 };
+      status.errors.push(`${src.name}: ${res.error}`);
+      continue;
+    }
+    const fresh = [];
+    for (const raw of res.items) {
+      const id = raw.id;
+      if (!id) continue;
+      const dedupKey = `${key}::${id}`;
+      if (seen[dedupKey]) continue;
+      seen[dedupKey] = date;
+      fresh.push(normalize(raw, src));
+    }
+    status.sources[key] = { ok: true, collected: res.items.length, newCount: fresh.length };
+    status.newTotal += fresh.length;
+    newItems.push(...fresh);
   }
 
   saveSeen(seen);

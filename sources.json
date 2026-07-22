@@ -1,5 +1,5 @@
 {
-  "_说明": "通用信源注册表（web-article-collector）。运行方式见各 source 的 type。新增信源只需往 sources 数组加一条。",
+  "_说明": "通用信源注册表。type=linkedin_feed/rss/webpage 由 node 采集；type=tencent_stock_mcp/fund_mcp 由 agent 调 MCP 采集后写入 state/mcp_*.json，core.js 自动摄入。",
   "sources": [
     {
       "name": "刘润",
@@ -35,19 +35,23 @@
     {
       "name": "腾讯自选股资讯",
       "platform": "tencent_stock",
-      "type": "tencent_stock_news",
-      "symbols": [],
+      "type": "tencent_stock_mcp",
+      "collect_via": "mcp",
+      "raw_file": "state/mcp_stock.json",
+      "symbols": ["sh600519", "sz000001"],
       "limit": 10,
       "category": "股票",
-      "_note": "把 symbols 填上你的自选股代码，如 [\"sh600519\",\"sz000001\",\"hk00700\"]。底层调 westock-data notice list（腾讯自选股公告/资讯流）。"
+      "_note": "由 agent 调 westock-mcp data_news 采集，结果经 ingest_mcp.js 写入 state/mcp_stock.json。把 symbols 改成你的自选股代码（如 hk00700）。"
     },
     {
-      "name": "基金净值",
+      "name": "基金净值与资讯",
       "platform": "fund",
-      "type": "fund",
-      "fund_codes": [],
+      "type": "fund_mcp",
+      "collect_via": "mcp",
+      "raw_file": "state/mcp_fund.json",
+      "fund_codes": ["110011", "161725"],
       "category": "基金",
-      "_note": "把 fund_codes 填上基金代码，如 [\"110011\",\"161725\"]。底层调东方财富 lsjz 取最新单位净值+日涨跌。"
+      "_note": "由 agent 调 yingmi-mcp（BatchGetFundsDetail 取净值 + SearchFinancialNews 取资讯）采集，经 ingest_mcp.js 写入 state/mcp_fund.json。把 fund_codes 改成你的基金代码。"
     }
   ]
 }

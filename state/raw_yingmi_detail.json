@@ -1,0 +1,41 @@
+[
+  {
+    "fundCode": "110011",
+    "data": {
+      "summary": {
+        "fundCode": "110011",
+        "fundName": "易方达优质精选混合(QDII)",
+        "fundInvestType": "混合型",
+        "dailyReturn": "-0.68%",
+        "nav": 4.1282,
+        "navDate": "2026年07月21日",
+        "netAsset": "67.77亿",
+        "oneYearReturn": "-19.72%",
+        "risk5Level": 3
+      },
+      "managers": [
+        { "fundManagerName": "张坤" },
+        { "fundManagerName": "彭珂" }
+      ]
+    }
+  },
+  {
+    "fundCode": "161725",
+    "data": {
+      "summary": {
+        "fundCode": "161725",
+        "fundName": "招商中证白酒指数基金A",
+        "fundInvestType": "股票型",
+        "dailyReturn": "-1.47%",
+        "nav": 0.55,
+        "navDate": "2026年07月21日",
+        "netAsset": "313.02亿",
+        "oneYearReturn": "-26.99%",
+        "risk5Level": 4
+      },
+      "managers": [
+        { "fundManagerName": "侯昊" }
+      ]
+    }
+  }
+]
