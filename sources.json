@@ -27,9 +27,10 @@
       "name": "示例固定网页",
       "platform": "webpage",
       "type": "webpage",
+      "enabled": false,
       "url": "https://example.com/news",
       "category": "其他",
-      "_note": "固定网页监听：抓取该页面上所有文章链接+标题，按 URL 去重。把 url 改成你想监控的栏目页即可。"
+      "_note": "固定网页监听：抓取该页面上所有文章链接+标题，按 URL 去重。把 url 改成你想监控的栏目页、并设 enabled:true 即可启用。"
     },
     {
       "name": "腾讯自选股资讯",

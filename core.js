@@ -63,6 +63,10 @@ async function runCollection() {
   const status = { date, runAt: new Date().toISOString(), sources: {}, newTotal: 0, errors: [] };
 
   for (const src of sources) {
+    if (src.enabled === false || src._disabled) {
+      status.sources[`${src.platform || src.type}:${src.name}`] = { ok: true, skipped: true, reason: '已禁用(enabled=false)' };
+      continue;
+    }
     const key = `${src.platform || src.type}:${src.name}`;
     const adapter = ADAPTERS[src.type];
     if (!adapter) {
