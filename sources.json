@@ -1,0 +1,52 @@
+{
+  "_说明": "通用信源注册表（web-article-collector）。运行方式见各 source 的 type。新增信源只需往 sources 数组加一条。",
+  "sources": [
+    {
+      "name": "刘润",
+      "platform": "wechat",
+      "type": "rss",
+      "biz": "MjM5NjM5MjQ4MQ==",
+      "feed_url": "http://<你的wechat2rss地址>/wechat/MjM5NjM5MjQ4MQ==",
+      "default_tz": "Asia/Shanghai",
+      "strict": true,
+      "adapter": "rss_adapter.parse_rss",
+      "category": "财经",
+      "_note": "微信文章时间来自页面 var ct（群发定死），置信度 high。feed_url 需由 wechat2rss 实例提供。"
+    },
+    {
+      "name": "GasTurbineHub",
+      "platform": "linkedin",
+      "type": "linkedin_feed",
+      "base_url": "https://www.linkedin.com/company/gasturbinehub/posts/?feedView=all",
+      "default_tz": "America/New_York",
+      "strict": true,
+      "category": "燃气轮机",
+      "_note": "用已登录的 Edge profile 副本采集。时间首选卡片 <time datetime>；登录态失效需重登。"
+    },
+    {
+      "name": "示例固定网页",
+      "platform": "webpage",
+      "type": "webpage",
+      "url": "https://example.com/news",
+      "category": "其他",
+      "_note": "固定网页监听：抓取该页面上所有文章链接+标题，按 URL 去重。把 url 改成你想监控的栏目页即可。"
+    },
+    {
+      "name": "腾讯自选股资讯",
+      "platform": "tencent_stock",
+      "type": "tencent_stock_news",
+      "symbols": [],
+      "limit": 10,
+      "category": "股票",
+      "_note": "把 symbols 填上你的自选股代码，如 [\"sh600519\",\"sz000001\",\"hk00700\"]。底层调 westock-data notice list（腾讯自选股公告/资讯流）。"
+    },
+    {
+      "name": "基金净值",
+      "platform": "fund",
+      "type": "fund",
+      "fund_codes": [],
+      "category": "基金",
+      "_note": "把 fund_codes 填上基金代码，如 [\"110011\",\"161725\"]。底层调东方财富 lsjz 取最新单位净值+日涨跌。"
+    }
+  ]
+}

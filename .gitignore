@@ -1,0 +1,15 @@
+# 凭据与登录态（绝不提交）
+email_config.json
+github_config.json
+edge-profile/
+
+# 依赖
+node_modules/
+
+# 临时/大文件
+*.png
+daily_status.json
+li_state.png
+
+# 系统
+.DS_Store

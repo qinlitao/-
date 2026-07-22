@@ -1,0 +1,8 @@
+{
+  "host": "smtp.163.com",
+  "port": 465,
+  "secure": true,
+  "user": "你的163邮箱@163.com",
+  "authCode": "你的163授权码(非登录密码)",
+  "to": "接收邮箱@163.com"
+}
