@@ -30,9 +30,10 @@ function backup(date) {
     try { sh('git rev-parse --is-inside-work-tree'); }
     catch (e) {
       sh('git init');
-      sh('git config user.email "collector@local"');
-      sh('git config user.name "daily-collector"');
     }
+    // 确保本地 git 身份存在（仓库已存在时不会走上面的 init 分支）
+    try { sh('git config user.email'); } catch { sh('git config user.email "collector@local"'); }
+    try { sh('git config user.name'); } catch { sh('git config user.name "daily-collector"'); }
 
     // 只 add 指定路径
     const existing = TRACKED.filter(p => fs.existsSync(path.join(ROOT, p)));
@@ -48,9 +49,16 @@ function backup(date) {
     const cfg = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : null;
     if (cfg && cfg.repo) {
       try {
-        sh(`git remote get-url origin 2>nul || git remote add origin ${cfg.repo}`);
-        sh('git push origin HEAD', 120000);
-        result.steps.push('pushed');
+        // 把 PAT 注入 URL（token 单独存放，避免把明文 token 写进 base repo 字段）
+        const base = cfg.repo;
+        const authUrl = (cfg.token && !/^https:\/\/[^@]+@/.test(base))
+          ? base.replace(/^https:\/\//, `https://${cfg.token}@`)
+          : base;
+        sh(`git remote get-url origin 2>nul || git remote add origin ${authUrl}`);
+        // 推到独立分支，避免覆盖仓库已有的 main（备份互不干扰）
+        const branch = cfg.branch || 'daily-news';
+        sh(`git push origin HEAD:refs/heads/${branch}`, 120000);
+        result.steps.push(`pushed -> ${branch}`);
       } catch (e) {
         result.pushError = `push 失败: ${e.message}`;
       }
