@@ -52,7 +52,7 @@ function backup(date) {
         // 把 PAT 注入 URL（token 单独存放，避免把明文 token 写进 base repo 字段）
         const base = cfg.repo;
         const authUrl = (cfg.token && !/^https:\/\/[^@]+@/.test(base))
-          ? base.replace(/^https:\/\//, `https://${cfg.token}@`)
+          ? base.replace(/^https:\/\//, `https://${cfg.token}:@`)
           : base;
         sh(`git remote get-url origin 2>nul || git remote add origin ${authUrl}`);
         // 始终用最新 token 同步 remote（token 变更后才会生效）
