@@ -15,7 +15,7 @@ const CONFIG_FILE = path.join(ROOT, 'github_config.json');
 const TRACKED = [
   'daily_report', 'weekly_report', 'monthly_report', 'state',
   'sources.json', 'core.js', 'classify.js', 'reports.js', 'email.js', 'backup.js',
-  'run_daily.js', 'run_weekly.js', 'run_monthly.js', 'adapters',
+  'run_daily.js', 'run_weekly.js', 'run_monthly.js', 'ingest_mcp.js', 'adapters',
   'email_config.json.example', 'github_config.json.example', '.gitignore',
   'linkedin_gasturbinehub.json', 'linkedin_gasturbinehub.md'
 ];
