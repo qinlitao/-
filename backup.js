@@ -55,9 +55,14 @@ function backup(date) {
           ? base.replace(/^https:\/\//, `https://${cfg.token}@`)
           : base;
         sh(`git remote get-url origin 2>nul || git remote add origin ${authUrl}`);
+        // 始终用最新 token 同步 remote（token 变更后才会生效）
+        if (cfg.token) sh(`git remote set-url origin ${authUrl}`);
         // 推到独立分支，避免覆盖仓库已有的 main（备份互不干扰）
         const branch = cfg.branch || 'daily-news';
-        sh(`git push origin HEAD:refs/heads/${branch}`, 120000, { GIT_TERMINAL_PROMPT: '0' });
+        // 禁用 Windows Git Credential Manager / 任何凭据助手，强制只用 URL 内嵌的 token；
+        // 否则 GCM 会弹 GUI 并卡死沙箱。GIT_TERMINAL_PROMPT=0 让其快速失败而非等待。
+        const pushEnv = { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' };
+        sh(`git -c credential.helper= -c http.sslVerify=true push origin HEAD:refs/heads/${branch}`, 120000, pushEnv);
         result.steps.push(`pushed -> ${branch}`);
       } catch (e) {
         result.pushError = `push 失败: ${e.message}`;
