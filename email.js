@@ -11,6 +11,25 @@ const CONFIG_FILE = path.join(ROOT, 'email_config.json');
 const LABEL = { daily: '每日', weekly: '每周', monthly: '每月' };
 
 function loadConfig() {
+  // 优先使用 netease-mail 连接器注入的环境变量（用户已在连接器 UI 绑定 163 授权码）
+  const envUser = process.env.NETEASE_EMAIL_USER;
+  const envPass = process.env.NETEASE_EMAIL_PASS;
+  if (envUser && envPass) {
+    let file = null;
+    if (fs.existsSync(CONFIG_FILE)) {
+      try { file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch (e) { file = null; }
+    }
+    return {
+      user: envUser,
+      authCode: envPass,
+      host: (file && file.host) || 'smtp.163.com',
+      port: (file && file.port) || 465,
+      secure: file && file.secure !== undefined ? file.secure : true,
+      to: (file && file.to) || envUser,
+      _source: 'netease-mail-connector-env'
+    };
+  }
+  // 回退：本地 email_config.json
   if (!fs.existsSync(CONFIG_FILE)) return null;
   try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); }
   catch (e) { return null; }
