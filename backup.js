@@ -20,8 +20,8 @@ const TRACKED = [
   'linkedin_gasturbinehub.json', 'linkedin_gasturbinehub.md'
 ];
 
-function sh(cmd, timeout = 60000) {
-  return execSync(cmd, { cwd: ROOT, encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'] });
+function sh(cmd, timeout = 60000, env = {}) {
+  return execSync(cmd, { cwd: ROOT, encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } });
 }
 
 function backup(date) {
@@ -57,7 +57,7 @@ function backup(date) {
         sh(`git remote get-url origin 2>nul || git remote add origin ${authUrl}`);
         // 推到独立分支，避免覆盖仓库已有的 main（备份互不干扰）
         const branch = cfg.branch || 'daily-news';
-        sh(`git push origin HEAD:refs/heads/${branch}`, 120000);
+        sh(`git push origin HEAD:refs/heads/${branch}`, 120000, { GIT_TERMINAL_PROMPT: '0' });
         result.steps.push(`pushed -> ${branch}`);
       } catch (e) {
         result.pushError = `push 失败: ${e.message}`;
