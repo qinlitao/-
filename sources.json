@@ -37,7 +37,7 @@
       "platform": "tencent_stock",
       "type": "tencent_stock_mcp",
       "collect_via": "mcp",
-      "raw_file": "state/mcp_stock.json",
+      "raw_file": "mcp_stock.json",
       "symbols": ["sh600519", "sz000001"],
       "limit": 10,
       "category": "股票",
@@ -48,7 +48,7 @@
       "platform": "fund",
       "type": "fund_mcp",
       "collect_via": "mcp",
-      "raw_file": "state/mcp_fund.json",
+      "raw_file": "mcp_fund.json",
       "fund_codes": ["110011", "161725"],
       "category": "基金",
       "_note": "由 agent 调 yingmi-mcp（BatchGetFundsDetail 取净值 + SearchFinancialNews 取资讯）采集，经 ingest_mcp.js 写入 state/mcp_fund.json。把 fund_codes 改成你的基金代码。"
