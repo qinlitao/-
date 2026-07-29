@@ -175,7 +175,8 @@ function renderReport(period) {
     // 日报：按各条目自身 windowDays（press 14天，普通 1天）保留
     const ws = winStart(1), we = new Date(year, month, day, 0, 0, 0);
     items = items.filter(it => {
-      if (!it.publishDate) return true;
+      // 无发布日期的条目无法确认落在时间窗内 → 从窗口报告中剔除（避免历史无日期帖每期都出现）
+      if (!it.publishDate) return false;
       const wd = it.windowDays || 1;
       const d = new Date(it.publishDate);
       // press 用其滚动窗(>=1天)；非press 严格前一天
@@ -185,14 +186,16 @@ function renderReport(period) {
   } else if (period === 'weekly') {
     const ws = winStart(7);
     items = items.filter(it => {
-      if (!it.publishDate) return true;
+      // 无发布日期的条目无法确认落在时间窗内 → 从窗口报告中剔除（避免历史无日期帖每期都出现）
+      if (!it.publishDate) return false;
       const wd = Math.max(it.windowDays || 1, 7);
       return new Date(it.publishDate) >= winStart(wd);
     });
   } else if (period === 'monthly') {
     const ws = winStart(30);
     items = items.filter(it => {
-      if (!it.publishDate) return true;
+      // 无发布日期的条目无法确认落在时间窗内 → 从窗口报告中剔除（避免历史无日期帖每期都出现）
+      if (!it.publishDate) return false;
       const wd = Math.max(it.windowDays || 1, 30);
       return new Date(it.publishDate) >= winStart(wd);
     });
