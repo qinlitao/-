@@ -7,6 +7,37 @@ const { chromium } = require('playwright');
 
 const PROFILE = path.join(__dirname, '..', 'edge-profile');
 
+/**
+ * 将 LinkedIn 相对时间字符串换算为 ISO 8601 绝对时间。
+ * 支持中英文混合格式："3 周前"/"2 weeks ago"/"1 个月前"/"5 days ago" 等。
+ * 换算不精确（月按30天、周按7天），目的是让 core.js 的 windowDays 过滤能正常执行。
+ * 无法解析时原样返回，core.js 遇到无法解析的字符串会 return true（保留），
+ * 但这比"1 年前"的帖子被当成新条目混入要好得多。
+ */
+function relativeToIso(text) {
+  if (!text) return '';
+  const t = text.toLowerCase().trim();
+  const now = Date.now();
+
+  // 中英文数字单位映射
+  const map = [
+    { re: /(\d+)\s*(秒|second)/,          ms: n => n * 1000 },
+    { re: /(\d+)\s*(分钟?|minute)/,        ms: n => n * 60 * 1000 },
+    { re: /(\d+)\s*(小时|hour)/,           ms: n => n * 3600 * 1000 },
+    { re: /(\d+)\s*(天|day)/,              ms: n => n * 86400 * 1000 },
+    { re: /(\d+)\s*(周|week)/,             ms: n => n * 7 * 86400 * 1000 },
+    { re: /(\d+)\s*(个?月|month)/,         ms: n => n * 30 * 86400 * 1000 },
+    { re: /(\d+)\s*(年|year)/,             ms: n => n * 365 * 86400 * 1000 },
+  ];
+  for (const { re, ms } of map) {
+    const m = t.match(re);
+    if (m) return new Date(now - ms(parseInt(m[1]))).toISOString();
+  }
+  // 刚刚/just now
+  if (/刚刚|just now/.test(t)) return new Date(now).toISOString();
+  return text; // 无法解析，透传
+}
+
 async function collect(source) {
   const url = source.base_url;
   const items = [];
@@ -88,13 +119,22 @@ async function collect(source) {
     });
 
     for (const p of posts) {
+      // 优先用 <time datetime="..."> 属性（ISO 格式），保证 core.js 时间窗口过滤生效。
+      // timeText 是相对字符串（"3 周前"/"2 months ago"），只在 datetime 缺失时兜底换算。
+      let publishedText = '';
+      if (p.datetime) {
+        publishedText = p.datetime; // e.g. "2026-07-28T10:00:00Z"
+      } else if (p.timeText) {
+        publishedText = relativeToIso(p.timeText); // 换算为绝对 ISO，失败则透传原字符串
+      }
       items.push({
         id: p.id,
         title: p.author ? `${p.author} 的动态` : 'LinkedIn 动态',
         url: url,
         text: p.text,
         images: p.images,
-        publishedText: p.timeText + (p.datetime ? ` (${p.datetime})` : '')
+        publishedText,
+        displayTime: p.timeText || '',  // 保留原始相对时间，供日报展示用
       });
     }
     await context.close().catch(() => {});

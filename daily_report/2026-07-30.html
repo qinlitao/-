@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资讯日报 · {DATE_LABEL}</title>
+<style>
+  :root{
+    --bg:#0f1117; --bg-soft:#171a22; --card:#1b1f29; --card-hover:#222736;
+    --text:#e8eaf0; --muted:#9aa3b6; --border:#2a2f3c; --shadow:0 6px 24px rgba(0,0,0,.38);
+    --hero-grad:linear-gradient(135deg,#4f46e5 0%,#7c3aed 45%,#db2777 100%);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f5f6fb; --bg-soft:#ffffff; --card:#ffffff; --card-hover:#f1f3fa;
+      --text:#171a22; --muted:#5b6573; --border:#e7eaf2; --shadow:0 6px 22px rgba(30,40,80,.10);
+      --hero-grad:linear-gradient(135deg,#6366f1 0%,#8b5cf6 45%,#ec4899 100%); }
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+
+  /* ---------- HERO ---------- */
+  .hero{background:var(--hero-grad);color:#fff;padding:38px 22px 30px;text-align:center;position:relative;overflow:hidden;}
+  .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% -20%,rgba(255,255,255,.18),transparent 60%);pointer-events:none;}
+  .hero .kicker{font-size:13px;letter-spacing:.32em;text-transform:uppercase;opacity:.85;margin:0 0 6px;}
+  .hero h1{margin:0;font-size:clamp(26px,5vw,40px);font-weight:800;letter-spacing:.02em;}
+  .hero .date-big{font-size:clamp(20px,4vw,30px);font-weight:700;margin:14px 0 2px;}
+  .hero .window{font-size:14px;opacity:.92;margin:0 0 18px;}
+  .stat-total{display:inline-flex;align-items:baseline;gap:8px;background:rgba(255,255,255,.16);
+    backdrop-filter:blur(6px);padding:8px 18px;border-radius:999px;font-size:15px;margin-bottom:20px;}
+  .stat-total b{font-size:24px;font-weight:800;}
+  .sec-chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:920px;margin:0 auto;}
+  .sec-chip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.13);
+    border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:999px;font-size:13px;cursor:pointer;transition:.15s;}
+  .sec-chip:hover{background:rgba(255,255,255,.26);}
+  .sec-chip .dot{width:9px;height:9px;border-radius:50%;}
+  .sec-chip b{font-weight:700;}
+
+  /* ---------- ANCHOR NAV ---------- */
+  .nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;gap:6px;
+    padding:10px 14px;overflow-x:auto;scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav a{flex:0 0 auto;font-size:13.5px;color:var(--muted);padding:7px 12px;border-radius:9px;
+    border:1px solid transparent;white-space:nowrap;transition:.15s;}
+  .nav a:hover{color:var(--text);background:var(--card-hover);border-color:var(--border);}
+  .nav .totop{margin-left:auto;color:var(--muted);}
+
+  /* ---------- SECTIONS ---------- */
+  main{max-width:1180px;margin:0 auto;padding:26px 16px 60px;}
+  .section{margin:30px 0 8px;scroll-margin-top:64px;}
+  .section-head{display:flex;align-items:center;gap:12px;margin:0 0 16px;}
+  .section-head .bar{width:5px;height:26px;border-radius:3px;background:var(--sec);}
+  .section-head h2{margin:0;font-size:20px;font-weight:800;}
+  .section-head .cnt{margin-left:auto;font-size:13px;color:var(--muted);background:var(--card);
+    border:1px solid var(--border);padding:3px 11px;border-radius:999px;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:16px 16px 14px;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:.18s;position:relative;overflow:hidden;}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sec);opacity:.85;}
+  .card:hover{transform:translateY(-3px);background:var(--card-hover);}
+  .card .top{display:flex;align-items:center;gap:10px;}
+  .num{flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:var(--sec);color:#fff;
+    font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .src{margin-left:auto;font-size:12px;color:var(--muted);background:var(--bg-soft);
+    border:1px solid var(--border);padding:3px 10px;border-radius:999px;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .card h3{margin:2px 0 0;font-size:16px;font-weight:700;line-height:1.45;}
+  .card h3 a:hover{text-decoration:underline;text-decoration-color:var(--sec);}
+  .card .sum{margin:0;font-size:14px;color:var(--muted);flex:1;}
+  .card .foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
+  .card .read{font-size:13px;font-weight:600;color:var(--sec);display:inline-flex;align-items:center;gap:4px;}
+  .card .read:hover{text-decoration:underline;}
+  .card .when{font-size:12px;color:var(--muted);}
+
+  footer{max-width:1180px;margin:0 auto;padding:22px 16px 50px;color:var(--muted);font-size:13px;
+    border-top:1px solid var(--border);text-align:center;line-height:1.8;}
+  footer a{color:var(--sec);}
+  .badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--border);
+    margin-left:6px;vertical-align:middle;}
+  .badge.snap{color:#fbbf24;border-color:#fbbf2466;background:#fbbf2414;}
+  .empty{padding:40px;text-align:center;color:var(--muted);}
+</style>
+</head>
+<body>
+  <header class="hero">
+    <p class="kicker">信源采集引擎 · 日报仪表盘</p>
+    <h1>每日资讯日报</h1>
+    <div class="date-big" id="dateBig">—</div>
+    <p class="window" id="windowLine">—</p>
+    <div class="stat-total">本窗口共 <b id="totalNum">0</b> 条内容</div>
+    <div class="sec-chips" id="secChips"></div>
+  </header>
+
+  <nav class="nav" id="nav">
+    <a href="#top" class="totop">↑ 顶部</a>
+  </nav>
+
+  <main id="top">
+    <div id="sections"></div>
+  </main>
+
+  <footer id="footer"></footer>
+
+<script>
+/* ===== 内置数据快照（由 source-collection-engine 渲染产出） ===== */
+const EMBEDDED_DATA = {"date":"2026-07-30","period":"daily","windowText":"当日（北京时间）","sources":["BloombergNEF","Kawasaki Heavy Industries","GE Vernova"],"sections":[{"label":"科技","items":[{"title":"Sustainable Aviation Fuel Price Outlook: Leveling Off","url":"https://about.bnef.com/insights/clean-energy/sustainable-aviation-fuel-price-outlook-leveling-off/","summary":"Prices of sustainable aviation fuel, or SAF, are rising as the closure of the Strait of Hormuz disrupts global fuel markets. Higher oil-product prices are increasing demand for biofuels, particularly for road transport, as governments seek to soften the impact of elevated fuel costs. Prices in Northwest Europe, the largest SAF consumption hub, are set to remain elevated over the next year according to BloombergNEF analysis, averaging $2,746 per metric ton.","publishedText":"Thu, 16 Jul 2026 14:50:19 +0000","sourceName":"BloombergNEF"},{"title":"News &amp; Events","url":"https://www.khi.co.jp/en/corp/newsroom/index.html","summary":"News &amp; Events | Kawasaki Heavy Industries, Ltd. Skip to main content ANSWERS News &amp; Events Contact Search English Close 日本語 English 簡体中文 OPEN/CLOSE HOME Mobility Mobility Close Air Rail Marine Energy &amp; Environment Energy &amp; Environment Selection Guide Close Solutions CHP・Cogeneration","publishedText":"2026-07-15T16:00:00.000Z","sourceName":"Kawasaki Heavy Industries"},{"title":"Jul. 16, 2026 Kawasaki Launches Collaboration with NVIDIA to…","url":"https://www.khi.co.jp/en/corp/newsroom/news/detail/?f=20260716_9376","summary":"AI","publishedText":"2026-07-15T16:00:00.000Z","sourceName":"Kawasaki Heavy Industries"},{"title":"Jul. 16, 2026 Kawasaki Begins Business Study with Fujitsu To…","url":"https://www.khi.co.jp/en/corp/newsroom/news/detail/?f=20260716_2992","summary":"AI","publishedText":"2026-07-15T16:00:00.000Z","sourceName":"Kawasaki Heavy Industries"}]},{"label":"燃气轮机","items":[{"title":"GE Vernova expands Advanced Research Center to accelerate th…","url":"https://www.gevernova.com/news/press-releases/ge-vernova-expands-advanced-research-center-accelerate-future-energy-innovation","summary":"NISKAYUNA, NY, July 16, 2026&nbsp;– GE Vernova Inc. (NYSE: GEV)&nbsp;today hosted the grand opening of its expanded Advanced Research Center Frontier Campus in Niskayuna, New York, marking an important milestone in the company’s long-term strategy to advance energy innovation and develop","publishedText":"Thu, 16 Jul 2026 11:15:00\n +0000","sourceName":"GE Vernova"}]}]};
+
+const PALETTE = ["#818cf8","#34d399","#fbbf24","#fb7185","#22d3ee","#a78bfa","#f472b6","#4ade80","#60a5fa","#facc15"];
+const DEFAULT_COLOR = "#94a3b8";
+const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+
+function pad(n){return n<10?"0"+n:""+n;}
+function fmtDateHuman(s){
+  if(!s) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(m){ const d=new Date(+m[1], +m[2]-1, +m[3]); return `${m[1]}年${+m[2]}月${+m[3]}日 ${WEEK[d.getDay()]}`; }
+  return s;
+}
+function fmtWhen(s){
+  if(!s) return "";
+  // 已是相对描述（如 "5 天前"）直接清理尾部的 "•"
+  let t = String(s).replace(/•/g,"").replace(/\s+/g," ").trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if(m){ const d=new Date(+m[1], +m[2]-1, +m[3]); return `${m[1]}年${+m[2]}月${+m[3]}日`; }
+  return t;
+}
+function truncate(s,n){
+  const arr=[...(s||"")];
+  return arr.length>n ? arr.slice(0,n).join("")+"…" : s;
+}
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function render(data){
+  const secs = data.sections||[];
+  const date = data.date || "";
+  document.getElementById("dateBig").textContent = fmtDateHuman(date);
+  document.getElementById("windowLine").textContent = data.windowText || "";
+
+  let total=0; secs.forEach(s=>total+=(s.items?s.items.length:0));
+  document.getElementById("totalNum").textContent = total;
+
+  const chips=document.getElementById("secChips"), nav=document.getElementById("nav");
+  chips.innerHTML=""; nav.querySelectorAll("a:not(.totop)").forEach(a=>a.remove());
+
+  secs.forEach((s,idx)=>{
+    const col=PALETTE[idx%PALETTE.length];
+    const n=(s.items?s.items.length:0);
+    const chip=document.createElement("div");
+    chip.className="sec-chip";
+    chip.innerHTML=`<span class="dot" style="background:${col}"></span>${esc(s.label)} <b>${n}</b>`;
+    chip.onclick=()=>document.getElementById("sec-"+idx).scrollIntoView();
+    chips.appendChild(chip);
+    const link=document.createElement("a");
+    link.href="#sec-"+idx; link.textContent=s.label;
+    nav.insertBefore(link,nav.querySelector(".totop"));
+  });
+
+  const wrap=document.getElementById("sections");
+  wrap.innerHTML="";
+  let counter=0;
+  secs.forEach((s,idx)=>{
+    const col=PALETTE[idx%PALETTE.length];
+    const sec=document.createElement("section");
+    sec.className="section"; sec.id="sec-"+idx; sec.style.setProperty("--sec",col);
+    const items=s.items||[];
+    sec.innerHTML=`<div class="section-head"><span class="bar"></span><h2>${esc(s.label)}</h2>`
+      +`<span class="cnt">${items.length} 条</span></div>`;
+    const grid=document.createElement("div"); grid.className="grid";
+    items.forEach(it=>{
+      counter++;
+      const url=it.url||"#";
+      const src=it.sourceName||"未知来源";
+      const sum=truncate(it.summary,60);
+      const card=document.createElement("article");
+      card.className="card"; card.style.setProperty("--sec",col);
+      card.innerHTML=
+        `<div class="top"><span class="num">${counter}</span>`
+        +`<span class="src" title="${esc(src)}">${esc(src)}</span></div>`
+        +`<h3><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(it.title||"")}</a></h3>`
+        +`<p class="sum">${esc(sum)}</p>`
+        +`<div class="foot"><a class="read" href="${esc(url)}" target="_blank" rel="noopener noreferrer">查看原文 ↗</a>`
+        +`<span class="when">${esc(fmtWhen(it.publishedText))}</span></div>`;
+      grid.appendChild(card);
+    });
+    sec.appendChild(grid);
+    wrap.appendChild(sec);
+  });
+
+  if(!secs.length){
+    wrap.innerHTML=`<div class="empty">本窗口内暂无采集内容。</div>`;
+  }
+
+  const srcList=(data.sources||[]).map(s=>`<b>${esc(s)}</b>`).join("、");
+  document.getElementById("footer").innerHTML=
+    `总条数 <b>${total}</b> 条 · 数据来源 ${srcList||"—"}`
+    +` · 报告日期 ${esc(date)} <span class="badge snap">引擎快照</span><br>`
+    +`本仪表盘由 source-collection-engine 渲染：每日仅需重跑流水线即可复用同一版式。`;
+}
+
+render(EMBEDDED_DATA);
+</script>
+</body>
+</html>
