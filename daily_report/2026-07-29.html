@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资讯日报 · {DATE_LABEL}</title>
+<style>
+  :root{
+    --bg:#0f1117; --bg-soft:#171a22; --card:#1b1f29; --card-hover:#222736;
+    --text:#e8eaf0; --muted:#9aa3b6; --border:#2a2f3c; --shadow:0 6px 24px rgba(0,0,0,.38);
+    --hero-grad:linear-gradient(135deg,#4f46e5 0%,#7c3aed 45%,#db2777 100%);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f5f6fb; --bg-soft:#ffffff; --card:#ffffff; --card-hover:#f1f3fa;
+      --text:#171a22; --muted:#5b6573; --border:#e7eaf2; --shadow:0 6px 22px rgba(30,40,80,.10);
+      --hero-grad:linear-gradient(135deg,#6366f1 0%,#8b5cf6 45%,#ec4899 100%); }
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased;}
+  a{color:inherit;text-decoration:none;}
+
+  /* ---------- HERO ---------- */
+  .hero{background:var(--hero-grad);color:#fff;padding:38px 22px 30px;text-align:center;position:relative;overflow:hidden;}
+  .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% -20%,rgba(255,255,255,.18),transparent 60%);pointer-events:none;}
+  .hero .kicker{font-size:13px;letter-spacing:.32em;text-transform:uppercase;opacity:.85;margin:0 0 6px;}
+  .hero h1{margin:0;font-size:clamp(26px,5vw,40px);font-weight:800;letter-spacing:.02em;}
+  .hero .date-big{font-size:clamp(20px,4vw,30px);font-weight:700;margin:14px 0 2px;}
+  .hero .window{font-size:14px;opacity:.92;margin:0 0 18px;}
+  .stat-total{display:inline-flex;align-items:baseline;gap:8px;background:rgba(255,255,255,.16);
+    backdrop-filter:blur(6px);padding:8px 18px;border-radius:999px;font-size:15px;margin-bottom:20px;}
+  .stat-total b{font-size:24px;font-weight:800;}
+  .sec-chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:920px;margin:0 auto;}
+  .sec-chip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.13);
+    border:1px solid rgba(255,255,255,.22);padding:6px 13px;border-radius:999px;font-size:13px;cursor:pointer;transition:.15s;}
+  .sec-chip:hover{background:rgba(255,255,255,.26);}
+  .sec-chip .dot{width:9px;height:9px;border-radius:50%;}
+  .sec-chip b{font-weight:700;}
+
+  /* ---------- ANCHOR NAV ---------- */
+  .nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;gap:6px;
+    padding:10px 14px;overflow-x:auto;scrollbar-width:none;}
+  .nav::-webkit-scrollbar{display:none;}
+  .nav a{flex:0 0 auto;font-size:13.5px;color:var(--muted);padding:7px 12px;border-radius:9px;
+    border:1px solid transparent;white-space:nowrap;transition:.15s;}
+  .nav a:hover{color:var(--text);background:var(--card-hover);border-color:var(--border);}
+  .nav .totop{margin-left:auto;color:var(--muted);}
+
+  /* ---------- SECTIONS ---------- */
+  main{max-width:1180px;margin:0 auto;padding:26px 16px 60px;}
+  .section{margin:30px 0 8px;scroll-margin-top:64px;}
+  .section-head{display:flex;align-items:center;gap:12px;margin:0 0 16px;}
+  .section-head .bar{width:5px;height:26px;border-radius:3px;background:var(--sec);}
+  .section-head h2{margin:0;font-size:20px;font-weight:800;}
+  .section-head .cnt{margin-left:auto;font-size:13px;color:var(--muted);background:var(--card);
+    border:1px solid var(--border);padding:3px 11px;border-radius:999px;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:15px;padding:16px 16px 14px;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:.18s;position:relative;overflow:hidden;}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sec);opacity:.85;}
+  .card:hover{transform:translateY(-3px);background:var(--card-hover);}
+  .card .top{display:flex;align-items:center;gap:10px;}
+  .num{flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:var(--sec);color:#fff;
+    font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;}
+  .src{margin-left:auto;font-size:12px;color:var(--muted);background:var(--bg-soft);
+    border:1px solid var(--border);padding:3px 10px;border-radius:999px;max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .card h3{margin:2px 0 0;font-size:16px;font-weight:700;line-height:1.45;}
+  .card h3 a:hover{text-decoration:underline;text-decoration-color:var(--sec);}
+  .card .sum{margin:0;font-size:14px;color:var(--muted);flex:1;}
+  .card .foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
+  .card .read{font-size:13px;font-weight:600;color:var(--sec);display:inline-flex;align-items:center;gap:4px;}
+  .card .read:hover{text-decoration:underline;}
+  .card .when{font-size:12px;color:var(--muted);}
+
+  footer{max-width:1180px;margin:0 auto;padding:22px 16px 50px;color:var(--muted);font-size:13px;
+    border-top:1px solid var(--border);text-align:center;line-height:1.8;}
+  footer a{color:var(--sec);}
+  .badge{display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--border);
+    margin-left:6px;vertical-align:middle;}
+  .badge.snap{color:#fbbf24;border-color:#fbbf2466;background:#fbbf2414;}
+  .empty{padding:40px;text-align:center;color:var(--muted);}
+</style>
+</head>
+<body>
+  <header class="hero">
+    <p class="kicker">信源采集引擎 · 日报仪表盘</p>
+    <h1>每日资讯日报</h1>
+    <div class="date-big" id="dateBig">—</div>
+    <p class="window" id="windowLine">—</p>
+    <div class="stat-total">本窗口共 <b id="totalNum">0</b> 条内容</div>
+    <div class="sec-chips" id="secChips"></div>
+  </header>
+
+  <nav class="nav" id="nav">
+    <a href="#top" class="totop">↑ 顶部</a>
+  </nav>
+
+  <main id="top">
+    <div id="sections"></div>
+  </main>
+
+  <footer id="footer"></footer>
+
+<script>
+/* ===== 内置数据快照（由 source-collection-engine 渲染产出） ===== */
+const EMBEDDED_DATA = {"date":"2026-07-29","period":"daily","windowText":"当日（北京时间）","sources":["Mitsubishi Power","INNIO (Jenbacher/Waukesha)","GE Vernova","Harvard Business Review","BCG Insights","Ansaldo Energia","Rolls-Royce","Siemens Energy"],"sections":[{"label":"战略管理","items":[{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Three paths to success. https://s.hbr.org/42z0cfe","publishedText":"6 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"In this week’s edition of The Insider, a subscriber-only newsletter, tech editor Tom Stackpole highlights a new study of early-career professionals showing how these employees engage with AI and how this engagement predicts performance better than existing skills or AI literacy. He also points to related research on how employees cope when held accountable for AI decisions they don’t fully understand. Both pieces point to the same conclusion: leaders need to train people on how to actually work with AI, not just assume skilled employees will figure it out. Subscriber to HBR to get The Insider in your inbox every week. https://s.hbr.org/44TalEU","publishedText":"5 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Referrals may be one of the most overlooked sources of profitable growth. An analysis of more than 10 million consumers found that referred customers make up about 20% of new customers but generate 72% of the profits from that group. They cost less to acquire, stay longer, spend more, and often bring in other high-value customers. Yet many attribution systems still overvalue paid channels while missing the impact of word of mouth. Leading companies track referral behavior, identify genuine promoters, and create experiences people want to recommend. How earning customer advocacy can improve margins and support more durable growth: https://s.hbr.org/3TZyF5z","publishedText":"4 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Keep up with the ideas driving today’s business conversations. Explore the latest from HBR. https://s.hbr.org/4v77qD9","publishedText":"4 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Get the insights leaders rely on to make smarter decisions every day. Subscribe now. https://s.hbr.org/4xX9vUL","publishedText":"4 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Stay connected to the latest thinking with HBR email newsletters. Explore the collection and sign up today. https://s.hbr.org/4wkNuOj","publishedText":"3 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Understand decisions in the full context they were made—available with Premium and HBR Executive access. Explore HBS Case Selections. https://s.hbr.org/4eOWKmy","publishedText":"3 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Companies today are struggling to hire and retain talent, but more often than not the problem is self-inflicted. https://s.hbr.org/4u4YjTe","publishedText":"2 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"In the June 29, 2026, edition of The Insider, managing editor Gretchen Gavett highlights how AI is quietly burying middle managers and why the era of cheap capital is ending. https://s.hbr.org/3QI0oqp","publishedText":"1 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Discover enduring insights from the HBR magazine archive. https://s.hbr.org/4wjxsUP","publishedText":"2 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"New HBR reading lists are added regularly—each one curated by HBR editors and available exclusively to subscribers. https://s.hbr.org/4wn3uPR","publishedText":"1 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Stronger decisions start with better thinking. Get access to all the latest from HBR. https://s.hbr.org/4gOGx3k","publishedText":"1 天前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"To compete in business anywhere today, leaders at all levels need to learn about the culture and mindset that sets Chinese businesses apart. Stanford research fellow Dan Wang argues that they’ve built an edge that goes well beyond lower labor costs or government subsidies. He explains how dense manufacturing ecosystems, relentless internal competition, deep process knowledge, and an engineering-first mindset have helped these companies become global leaders; what those in the United States and Europe can learn from them; and where they still fall behind. Listen to the latest episode of HBR IdeaCast for more. https://s.hbr.org/4pKCzLG","publishedText":"46 分钟前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"The best leaders seek to understand why rule breaking happened in the first place. https://s.hbr.org/4bhCx7M","publishedText":"35 分钟前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Stay current with the latest thinking in business and management. Explore this week's articles. https://s.hbr.org/4eG1rPm","publishedText":"12 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Work through real leadership challenges with live events, case studies, and guided learning opportunities. Learn more about HBR Executive. https://s.hbr.org/4qMlvEq","publishedText":"9 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/harvard-business-review/posts/?feedView=all","summary":"Most organizations have moved beyond asking whether to adopt AI and are now focused on making it work. Join fellow HBR subscribers for an exclusive live discussion on the challenges of implementation—and what leaders can do about them. Subscribe now to join us: https://s.hbr.org/4fZw8Rv","publishedText":"7 小时前 •","sourceName":"Harvard Business Review"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/boston-consulting-group/posts/?feedView=all","summary":"BCG's Diana Dimitrova unpacks where the real value sits in defense tech. Cheaper, mass-produced systems are growing fast, but the real profits still sit with established defense makers. The open question is whether newer defense tech companies can turn a profit investors will back, or whether the technology is simply outpacing the business behind it. See the exchange below. https://on.bcg.com/4pwlZz7","publishedText":"4 天前 • 已编辑 •","sourceName":"BCG Insights"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/boston-consulting-group/posts/?feedView=all","summary":"65% of aerospace and defence companies can't move AI pilots into value at scale. At Farnborough Airshow, BCG's experts explained why. Top performers run half as many pilots yet see twice the ROI, because they focus AI on their biggest strategic problem first. Watch the full conversation.","publishedText":"4 天前 • 已编辑 •","sourceName":"BCG Insights"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/boston-consulting-group/posts/?feedView=all","summary":"Asuka Hayashi, Partner in our Tokyo office, shares her perspective on surfacing Japan's innovation potential for a global audience. *Japanese follows English. I have been working on a project to identify and map innovation across Japan, making it accessible to global experts who have historically found it difficult to navigate due to language and other barriers. One of the most meaningful aspects of this work was using AI to conduct research that would have taken months manually. AI made it possible to go both broad and deep, and to do so in a fraction of the time. Distilling all of that into something concise and immediately actionable for busy global experts was equally important, and one of the most engaging parts of the work. Before my career at BCG, I was a researcher myself. Being able to shine a light on Japan's research and innovation capabilities, and share that with the world, is something I find deeply rewarding. 東京オフィスのパートナー、Asuka Hayashiが、日本のイノベーションをグローバルに発信する取り組みについてお話しします。 現在、日本各地のイノベーションを網羅的に掘り起こし、言語や情報アクセスの壁からこれまでアプローチが難しかったグローバルの専門家に届けるプロジェクトに取り組んでいます。 この取り組みで大きな役割を果たしたのがAIです。従来であれば膨大な時間を要した調査を、広く深くかつ短期間でやり遂げることができました。多忙なグローバルの専門家に簡潔かつ的確に伝わるアウトプットをどう設計するかも、この仕事の重要な部分でした。 もともと研究者だった私にとって、日本の研究力やイノベーション力を世界に発信できることに、大きなやりがいを感じています。","publishedText":"4 天前 •","sourceName":"BCG Insights"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/boston-consulting-group/posts/?feedView=all","summary":"Boards and CEOs rarely disagree on the urgency of AI. Where they often diverge is on speed, scale, and how much measurable business impact to expect. Some boards feel their CEO isn't pushing the AI agenda decisively enough. Some CEOs feel the board is hindering their ambitions. Three moves can help to close this gap: coinvesting in AI literacy and hands-on experience, gaining a frontline view of the company’s AI deployments (and an honest assessment of its capabilities), and exploring the next frontier of AI with other practitioners across industries. A shared vision between board and CEO can help form a true partnership. Learn more: https://on.bcg.com/4wwTcx6","publishedText":"1 天前 •","sourceName":"BCG Insights"}]},{"label":"燃气轮机","items":[{"title":"2026","url":"https://power.mhi.com/news/index.html","summary":"NEWS | Mitsubishi Power Sorry, you need to enable JavaScript to visit this website. Skip to main content Select Regions Select Regions EMEA Asia Pacific Japan Americas India Africa CLOSE Header Menu News Inquiries Global Network News Inquiries Global Network About Us About Us About Mitsubishi Power,","publishedText":"2026-07-15T02:00:00.000Z","sourceName":"Mitsubishi Power"},{"title":"NEWS","url":"https://power.mhi.com/news/","summary":"NEWS | Mitsubishi Power Sorry, you need to enable JavaScript to visit this website. Skip to main content Select Regions Select Regions EMEA Asia Pacific Japan Americas India Africa CLOSE Header Menu News Inquiries Global Network News Inquiries Global Network About Us About Us About Mitsubishi Power,","publishedText":"2026-07-15T02:00:00.000Z","sourceName":"Mitsubishi Power"},{"title":"Press Release","url":"https://power.mhi.com/news/release","summary":"Press Release News Release | Mitsubishi Power Sorry, you need to enable JavaScript to visit this website. Skip to main content Select Regions Select Regions EMEA Asia Pacific Japan Americas India Africa CLOSE Header Menu News Inquiries Global Network News Inquiries Global Network About Us About Us A","publishedText":"2026-07-15T02:00:00.000Z","sourceName":"Mitsubishi Power"},{"title":"GE Vernova to deliver SF₆-free grid hubs for Stromnetz Berli…","url":"https://www.gevernova.com/news/press-releases/ge-vernova-deliver-sf6-free-grid-hubs-stromnetz-berlin","summary":"BERLIN, Germany, (16 July 2026):&nbsp;GE Vernova Inc. (NYSE: GEV) today announced it has been awarded two contracts by Stromnetz Berlin GmbH for the design, delivery and installation of two new high-voltage electrical substations in Wittenau and Neukölln. These grid nodes form part of Berlin’s high","publishedText":"Wed, 15 Jul 2026 11:06:54\n +0000","sourceName":"GE Vernova"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/ansaldo-energia/posts/?feedView=all","summary":"Last year, Ansaldo Energia was commissioned by the Swiss Federal Office of Energy to upgrade the Birr Test Center in Switzerland, helping strengthen the country's power supply security during the winter months. The plant is expected to become operational in February 2027, with a capacity of 250 MW. A new milestone has now been achieved: the GT26 rotor has successfully completed all refurbishment, rework and balancing activities at our Genoa facility and has started its journey to Birr. Thanks to the dedication, expertise and close collaboration of the teams involved, this complex activity was completed on schedule, bringing the project one step closer to operation.","publishedText":"2 周前 •","sourceName":"Ansaldo Energia"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/ansaldo-energia/posts/?feedView=all","summary":"Today, Ansaldo Energia and RINA signed an agreement to support Italian companies in accessing the growing nuclear market through a structured certification and qualification pathway. By combining industrial expertise and certification capabilities, the initiative will help companies develop the requirements needed to operate in one of the world’s fastest-growing energy sectors. With more than 420 reactors currently in operation worldwide, over 60 under construction, and global investment expected to reach USD 120 billion per year by 2030, the opportunity is significant. Discover the initiative and learn more in the full press release: 🔗https://lnkd.in/dN9TgMUi","publishedText":"1 天前 •","sourceName":"Ansaldo Energia"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/ansaldo-energia/posts/?feedView=all","summary":"𝗠𝗼𝗿𝗲 𝗱𝗮𝘁𝗮, 𝗼𝗿 𝘁𝗵𝗲 𝗿𝗶𝗴𝗵𝘁 𝗱𝗮𝘁𝗮? At the PLM 2026 International Conference in Lecce, the discussion focused on the relationship between product lifecycle management, intellectual property, innovation and artificial intelligence. Davide Pinna, Head of Intellectual Property & Design Process Quality at Ansaldo Energia, also took part in the Industrial Roundtable, highlighting a key point: the most competitive companies will not necessarily be those with the most data, but those able to transform trusted data, engineering expertise and AI-driven insights into sustainable industrial advantage. Data alone does not create value. Its real potential emerges when governance, intellectual property protection and technical knowledge work together.","publishedText":"17 小时前 •","sourceName":"Ansaldo Energia"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/rolls-royce/posts/?feedView=all","summary":"When aviation meets imagination, a flying masterpiece takes flight. Lately, that moment arrived with STARLUX Airlines as they welcomed their newest Airbus A350-1000, unveiled in the striking AIRSORAYAMA livery. A bold fusion of art and engineering, turning heads on the ground before even leaving it. But behind that beauty is performance. Powered by our Trent XWB-97 engines, this aircraft brings together elegance and efficiency, underpinned by the reliability STARLUX depends on as it continues to grow its long-haul network and connect more people, more places, and more possibilities. Because every journey is more than a destination. It’s an experience. A statement. A promise of what aviation can be. We’re proud to continue powering that ambition with STARLUX, and to be part of every journey ahead. Congratulations to the entire STARLUX team on this stunning addition to your fleet.","publishedText":"2 周前 •","sourceName":"Rolls-Royce"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/rolls-royce/posts/?feedView=all","summary":"That’s a wrap on Farnborough International Airshow 2026. There was a real buzz in our chalet throughout the week, from announcements demonstrating how we’re delivering for our customers today to strategic partnerships, Government engagement and conversations shaping the future of aerospace and defence. Together, these moments showed how we’re ready to power, ready to protect and ready to connect, today and for the future. Watch our wrap video to revisit our highlights.","publishedText":"1 天前 • 已编辑 •","sourceName":"Rolls-Royce"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/rolls-royce/posts/?feedView=all","summary":"Today, the future of ultra-long-haul travel became a reality. An Airbus A350-1000ULR powered by our Trent XWB-97 engines completed a non-stop journey from Australia to Europe in 24 hours and 24 minutes, as part of Qantas' Project Sunrise programme. A flight of this scale demands exceptional performance. With more than 4.5 million flying hours in service, the Trent XWB-97 combines proven reliability, durability and efficiency to give airlines the confidence to connect the world's most distant cities. As the aircraft crossed Europe, it passed over Derby, the home of the engines that made the journey possible and the place where Rolls-Royce has been helping shape the future of flight for more than a century. Project Sunrise is a powerful example of what can be achieved through innovation, partnership and a shared ambition to push the boundaries of aviation. Congratulations to everyone involved.","publishedText":"13 小时前 • 已编辑 •","sourceName":"Rolls-Royce"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/mitsubishi-power/posts/?feedView=all","summary":"At CERAWeek 2026, leaders from Mitsubishi Heavy Industries and Mitsubishi Power will be sharing insights on today’s most important topics⚡ See the list of speakers and session schedule👇","publishedText":"4 个月前 •","sourceName":"Mitsubishi Power"},{"title":"LinkedIn 动态","url":"https://www.linkedin.com/company/siemens-energy/posts/?feedView=all","summary":"Today Only: Ask a Grid Innovation Expert. What innovation will have the biggest impact on tomorrow's grid? Today, we're opening a with Matthias Foehr, VP of Product Management, Grid Technologies. Curious about emerging technologies, technical challenges, or future grid trends? Ask your questions on innovation in: 🔹 Power transformers 🔹 F-gas-free high-voltage equipment 🔹 HVDC & DC switching technologies 🔹 Grid stabilization technologies 🔹 Grid service offerings Drop your question in the comment section below, and Matthias will answer throughout the day. 👇 What would you like to ask?","publishedText":"21 小时前 •","sourceName":"Siemens Energy"}]},{"label":"燃气轮机·权威","items":[{"title":"2026-07-15\n[ Press Release ]Entergy and MHI Group Outline Co…","url":"https://power.mhi.com/news/260715.html","summary":"2026-07-15\n[ Press Release ]Entergy and MHI Group Outline Collaborative Partnership Designed to Accelerate Commercialization and Affordabili","publishedText":"2026-07-14T16:00:00.000Z","sourceName":"Mitsubishi Power"},{"title":"Date Announcement 2nd Quarter","url":"https://www.innio.com/en/news-media/media-center/others/date-announcement-2nd-quarter/","summary":"Date Announcement 2nd Quarter","publishedText":"Tue, 14 Jul 2026 16:44:02 +0000","sourceName":"INNIO (Jenbacher/Waukesha)"},{"title":"INNIO to announce second quarter 2026 financial results on 2…","url":"https://www.innio.com/en/news-media/press-releases/innio-to-announce-second-quarter-2026-financial-results-on-28-july/","summary":"Munich, Germany, July 14, 2026 – INNIO Group (NASDAQ: INIO), a leading global distributed energy solutions provider, is scheduled to release its second quarter 2026 financial results on Tuesday, July 28, 2026, before market open. INNIO’s management will host a conference call at 8:00 a.m. Eastern Time (ET) on the same day to discuss the […]","publishedText":"Tue, 14 Jul 2026 17:00:52 +0000","sourceName":"INNIO (Jenbacher/Waukesha)"}]}]};
+
+const PALETTE = ["#818cf8","#34d399","#fbbf24","#fb7185","#22d3ee","#a78bfa","#f472b6","#4ade80","#60a5fa","#facc15"];
+const DEFAULT_COLOR = "#94a3b8";
+const WEEK = ["周日","周一","周二","周三","周四","周五","周六"];
+
+function pad(n){return n<10?"0"+n:""+n;}
+function fmtDateHuman(s){
+  if(!s) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if(m){ const d=new Date(+m[1], +m[2]-1, +m[3]); return `${m[1]}年${+m[2]}月${+m[3]}日 ${WEEK[d.getDay()]}`; }
+  return s;
+}
+function fmtWhen(s){
+  if(!s) return "";
+  // 已是相对描述（如 "5 天前"）直接清理尾部的 "•"
+  let t = String(s).replace(/•/g,"").replace(/\s+/g," ").trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if(m){ const d=new Date(+m[1], +m[2]-1, +m[3]); return `${m[1]}年${+m[2]}月${+m[3]}日`; }
+  return t;
+}
+function truncate(s,n){
+  const arr=[...(s||"")];
+  return arr.length>n ? arr.slice(0,n).join("")+"…" : s;
+}
+function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+function render(data){
+  const secs = data.sections||[];
+  const date = data.date || "";
+  document.getElementById("dateBig").textContent = fmtDateHuman(date);
+  document.getElementById("windowLine").textContent = data.windowText || "";
+
+  let total=0; secs.forEach(s=>total+=(s.items?s.items.length:0));
+  document.getElementById("totalNum").textContent = total;
+
+  const chips=document.getElementById("secChips"), nav=document.getElementById("nav");
+  chips.innerHTML=""; nav.querySelectorAll("a:not(.totop)").forEach(a=>a.remove());
+
+  secs.forEach((s,idx)=>{
+    const col=PALETTE[idx%PALETTE.length];
+    const n=(s.items?s.items.length:0);
+    const chip=document.createElement("div");
+    chip.className="sec-chip";
+    chip.innerHTML=`<span class="dot" style="background:${col}"></span>${esc(s.label)} <b>${n}</b>`;
+    chip.onclick=()=>document.getElementById("sec-"+idx).scrollIntoView();
+    chips.appendChild(chip);
+    const link=document.createElement("a");
+    link.href="#sec-"+idx; link.textContent=s.label;
+    nav.insertBefore(link,nav.querySelector(".totop"));
+  });
+
+  const wrap=document.getElementById("sections");
+  wrap.innerHTML="";
+  let counter=0;
+  secs.forEach((s,idx)=>{
+    const col=PALETTE[idx%PALETTE.length];
+    const sec=document.createElement("section");
+    sec.className="section"; sec.id="sec-"+idx; sec.style.setProperty("--sec",col);
+    const items=s.items||[];
+    sec.innerHTML=`<div class="section-head"><span class="bar"></span><h2>${esc(s.label)}</h2>`
+      +`<span class="cnt">${items.length} 条</span></div>`;
+    const grid=document.createElement("div"); grid.className="grid";
+    items.forEach(it=>{
+      counter++;
+      const url=it.url||"#";
+      const src=it.sourceName||"未知来源";
+      const sum=truncate(it.summary,60);
+      const card=document.createElement("article");
+      card.className="card"; card.style.setProperty("--sec",col);
+      card.innerHTML=
+        `<div class="top"><span class="num">${counter}</span>`
+        +`<span class="src" title="${esc(src)}">${esc(src)}</span></div>`
+        +`<h3><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(it.title||"")}</a></h3>`
+        +`<p class="sum">${esc(sum)}</p>`
+        +`<div class="foot"><a class="read" href="${esc(url)}" target="_blank" rel="noopener noreferrer">查看原文 ↗</a>`
+        +`<span class="when">${esc(fmtWhen(it.publishedText))}</span></div>`;
+      grid.appendChild(card);
+    });
+    sec.appendChild(grid);
+    wrap.appendChild(sec);
+  });
+
+  if(!secs.length){
+    wrap.innerHTML=`<div class="empty">本窗口内暂无采集内容。</div>`;
+  }
+
+  const srcList=(data.sources||[]).map(s=>`<b>${esc(s)}</b>`).join("、");
+  document.getElementById("footer").innerHTML=
+    `总条数 <b>${total}</b> 条 · 数据来源 ${srcList||"—"}`
+    +` · 报告日期 ${esc(date)} <span class="badge snap">引擎快照</span><br>`
+    +`本仪表盘由 source-collection-engine 渲染：每日仅需重跑流水线即可复用同一版式。`;
+}
+
+render(EMBEDDED_DATA);
+</script>
+</body>
+</html>
