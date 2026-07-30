@@ -117,8 +117,8 @@ function hasGasTurbine(hay) {
  */
 // P1: JS 拦截页 / 导航页判定正则
 const JS_WALL_RE = /(enable javascript|just a moment|verify you are human|checking your browser|enable cookies)/i;
-// 导航类标题（整站菜单页常用，与具体新闻标题不同）
-const NAV_TITLE_RE = /^(media contacts?|press resources?|event calendar|event search|competitions?|newsroom|contact us|about us|privacy policy|terms of (use|service)|news(?: & | and )?events?|latest news|all news|press releases?|media|events)\s*$/i;
+// 导航类标题（整站菜单页常用，与具体新闻标题不同）— 与 adapters/web.js 对齐
+const NAV_TITLE_RE = /^(media contacts?|press resources?|event calendar|event search|competitions?|newsroom|contact us|about us|privacy policy|terms of (use|service)|news(?: & | and )?events?|latest news|all news|press releases?|media|events|learn more|news|press & media|media center|read more|view all|see all|more|details?|详情|阅读更多|查看|首页|新闻|媒体)\s*$/i;
 // 抓取到的整站菜单正文特征（CMS 模板残留，如 "Skip to main content"）
 const NAV_BOILERPLATE_RE = /skip to main content|skip to content/i;
 

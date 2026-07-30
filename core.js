@@ -92,6 +92,17 @@ function isInWindow(dateStr, windowDays) {
 
 function loadJson(p, def) { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : def; }
 
+/** URL 归一化：去 scheme / www / 尾斜杠 / fragment，保留 query（不同文章同 path+不同参数视为不同）
+ *  用于跨 scheme 去重（同一文章 http/https 镜像只留一条） */
+function normalizeUrl(u) {
+  try {
+    const x = new URL(u);
+    const host = x.hostname.replace(/^www\./, '');
+    const path = x.pathname.replace(/\/+$/, '');
+    return `${host}${path}${x.search}`.toLowerCase();
+  } catch (e) { return u; }
+}
+
 function loadSeen() { return loadJson(SEEN_FILE, {}); }
 function saveSeen(s) { ensureDir(STATE_DIR); fs.writeFileSync(SEEN_FILE, JSON.stringify(s, null, 2), 'utf8'); }
 
@@ -180,7 +191,8 @@ async function runCollection() {
     for (const raw of res.items) {
       const id = raw.id;
       if (!id) continue;
-      const dedupKey = `${key}::${id}`;
+      // 去重键用「源::归一化URL」，使 http/https 镜像、www 变体只算一条
+      const dedupKey = `${key}::${normalizeUrl(id)}`;
       if (seen[dedupKey]) continue;
 
       // 时间窗口过滤（按源 windowDays）
@@ -243,4 +255,4 @@ function writeRunLog(status) {
   } catch (e) { /* 日志非关键 */ }
 }
 
-module.exports = { runCollection, todayStr, yesterdayStr, parseDate, isInWindow, getShanghaiDate, ARCHIVE_FILE };
+module.exports = { runCollection, todayStr, yesterdayStr, parseDate, isInWindow, getShanghaiDate, normalizeUrl, ARCHIVE_FILE };

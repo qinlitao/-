@@ -243,7 +243,8 @@ function parseFlex(s) {
 // ---------- 导航/栏目/非文章页黑名单（press 直连抓取时过滤噪音）----------
 // 直连抓新闻页会把 "Media Contacts / Event Calendar / About" 等栏目页一并收进来，需剔除
 const NAV_PATH_RE = /(\/(media-contacts|press-resources|press-room|events?|event-calendar|event-search|competitions?|careers?|about|contact|login|signin|sign-in|search|sitemap|privacy|terms|newsletter|subscribe|account|cookie|accessibility|help|faq|tags?|categories|authors?|topic|home)\b)|(\.(pdf|zip|xml|rss)$)/i;
-const NAV_TITLE_RE = /^(media contacts|press resources|event calendar|event search|competitions?|about us|contact us|careers?|sign in|log ?in|search|sitemap|privacy policy|terms of (use|service)|newsletter|subscribe|home|menu)$/i;
+// 列表/栏目/落地页标题黑名单（扩展：覆盖 Learn more / News / Press & Media / 纯数字 等 CMS 通用标签）
+const NAV_TITLE_RE = /^(media contacts|press resources|event calendar|event search|competitions?|about us|contact us|careers?|sign in|log ?in|search|sitemap|privacy policy|terms of (use|service)|newsletter|subscribe|home|menu|learn more|news|press|press releases?|press & media|media center|media|read more|view all|see all|more|详情|阅读更多|查看|首页|新闻|媒体)$/i;
 
 function isNavCandidate(url, title) {
   try {
@@ -252,6 +253,40 @@ function isNavCandidate(url, title) {
   } catch (_) { /* ignore */ }
   if (title && NAV_TITLE_RE.test(title.trim().toLowerCase())) return true;
   return false;
+}
+
+/**
+ * 语义正文提取：优先 <article> / <main> 块，其次去 nav/header/footer/aside/脚本/样式后的正文。
+ * 避免把整站菜单("Skip to main content" / "M Login Independent coverage")当正文收进来。
+ * @returns {{text:string, isListPage:boolean}}
+ */
+function extractMainText(html, url) {
+  if (!html) return { text: '', isListPage: true };
+  let block = '';
+  // 1) 语义块优先
+  const semRe = /<(article|main)[^>]*>([\s\S]*?)<\/\1>/gi;
+  let m, best = '';
+  while ((m = semRe.exec(html)) !== null) {
+    if (m[2].length > best.length) best = m[2];
+  }
+  // 2) 退而求其次：剥离导航/页脚/脚本/样式后取 body
+  if (!best) {
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    const body = bodyMatch ? bodyMatch[1] : html;
+    const stripped = body
+      .replace(/<(script|style|nav|header|footer|aside)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ');
+    best = stripped;
+  } else {
+    best = best.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ');
+  }
+  const text = best.replace(/\s+/g, ' ').trim();
+  const low = text.toLowerCase();
+  // 列表页/导航残留判定：含 CMS 菜单关键字（多站点实测：M Login Independent coverage /
+  // Menu About ASME / Independent coverage of power generation since 1981 等重复站点页脚）
+  const cmsBoiler = /(skip to main content|skip to content|m login independent coverage|login\s+independent coverage|about\s+asme|menu\s+about|all rights reserved|cookie policy|accept cookies|independent coverage of (power|energy)|subscribe\s*-->|sections\s+home\s+news|sign in\/create account)/i;
+  const looksNav = cmsBoiler.test(low) || text.length < 80;
+  return { text: text.slice(0, 3000), isListPage: looksNav };
 }
 
 // 文章相似度打分：优先带日期/含 news·article·press-release 的链接，标题越长越像头条
@@ -325,31 +360,41 @@ async function collectPress(source) {
       }
       // allow_path 过滤（空=全收）
       if (allow.length && !allow.some(p => abs.includes(p))) continue;
-      // 剔除导航/栏目/非文章页噪音
+      // 剔除导航/栏目/非文章页噪音（标题级）
       if (isNavCandidate(abs, inner)) continue;
-      candidates.push({ url: abs, title: inner.slice(0, 140) });
+      // 抓取该链接正文，若仍是整站菜单/列表页则跳过（避免把栏目页当文章收进来）
+      let detailText = '';
+      const dRes = await httpGet(abs, { timeout: 15000 });
+      if (dRes.ok && dRes.body) {
+        const main = extractMainText(dRes.body, abs);
+        if (main.isListPage) continue;
+        detailText = main.text;
+      }
+      candidates.push({ url: abs, title: inner.slice(0, 140), text: detailText });
     } catch (e) { /* skip */ }
   }
 
   // 优先取"像文章"的链接（带日期/含 news·article 等），让 12 条上限落在真文章上
   candidates.sort((a, b) => articleScore(b) - articleScore(a));
 
-  // 逐篇取日期（上限 12，避免过多请求）
+  // 逐篇取日期 + 语义正文（上限 12，避免过多请求）
   let fetched = 0;
   for (const c of candidates) {
     if (fetched >= 12) break;
     fetched++;
     let pubDate = parseUrlDate(c.url);
-    let text = '';
-    if (!pubDate) {
+    let text = c.text || '';
+    if (!pubDate || !text) {
       const ar = await httpGet(c.url, { timeout: 15000 });
       if (ar.ok && ar.body) {
-        pubDate = extractDateFromHtml(ar.body, c.url);
-        // 取正文前 300 字做摘要
-        const txt = ar.body.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        text = txt.slice(0, 300);
+        pubDate = pubDate || extractDateFromHtml(ar.body, c.url);
+        const main = extractMainText(ar.body, c.url);
+        // 若正文仍是整站菜单/列表页 → 丢弃该候选（不污染日报）
+        if (main.isListPage) continue;
+        text = main.text;
       }
     }
+    if (!text) continue; // 无可读正文，跳过（避免空壳条目）
     items.push({
       id: c.url,
       title: c.title || '(无标题)',

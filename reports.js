@@ -4,8 +4,9 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { ARCHIVE_FILE, todayStr, parseDate, getShanghaiDate } = require('./core');
+const { ARCHIVE_FILE, todayStr, parseDate, getShanghaiDate, normalizeUrl } = require('./core');
 const { filterItem, cleanTitle } = require('./quality');
+const { translateItem } = require('./translate');
 
 const ROOT = __dirname;
 const OUT_DIR = {
@@ -215,6 +216,20 @@ function renderReport(period) {
     return db - da;
   });
 
+  // 渲染期同源去重兜底（归档内已存在的 http/https 镜像/尾斜杠重复，统一只显示一条）
+  const seenUrl = new Set();
+  const dedupDropped = [];
+  const itemsDedup = [];
+  for (const it of items) {
+    const norm = it.url ? normalizeUrl(it.url) : null;
+    if (norm) {
+      if (seenUrl.has(norm)) { dedupDropped.push(it.title); continue; }
+      seenUrl.add(norm);
+    }
+    itemsDedup.push(it);
+  }
+  items = itemsDedup;
+
   // 分组：分类 → 子模块 → items
   const structure = {};
   for (const it of items) {
@@ -225,12 +240,12 @@ function renderReport(period) {
     structure[cat][sub].push(it);
   }
 
-  // 统计
-  const translatedCount = items.filter(i => i.translated).length;
+  // 统计（翻译为展示层词典级，按展示副本计翻译条数）
+  const translatedCount = items.filter(i => translateItem(i).translated).length;
   const sourceSet = new Set(items.map(i => i.name));
 
   let md = `# ${LABEL[period]}资讯报告 · ${date}\n\n`;
-  md += `> 生成时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} | 统计窗口: ${period === 'daily' ? '前一天' : `近 ${period === 'weekly' ? 7 : 30} 天`} | 共 **${items.length}** 条（质量滤网滤除 ${droppedLog.length} 条噪音）| 覆盖 ${sourceSet.size} 个信源`;
+  md += `> 生成时间: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} | 统计窗口: ${period === 'daily' ? '前一天' : `近 ${period === 'weekly' ? 7 : 30} 天`} | 共 **${items.length}** 条（质量滤网滤除 ${droppedLog.length} 条噪音${dedupDropped.length ? `，渲染去重 ${dedupDropped.length} 条` : ''}）| 覆盖 ${sourceSet.size} 个信源`;
   if (translatedCount > 0) md += ` | 🌐 翻译 ${translatedCount} 条`;
   md += `\n\n---\n\n`;
 
@@ -280,10 +295,13 @@ function renderReport(period) {
       // 条目列表
       for (let i = 0; i < list.length; i++) {
         const it = list[i];
-        // 显示标题：优先 LLM 生成的干净中文标题，否则清洗后的原标题
-        const rawTitle = it.headline_cn || cleanTitle(it.title) || it.title || '(无标题)';
-        const title = it.originalTitle && it.originalTitle !== it.title
-          ? `${rawTitle}（原: ${it.originalTitle}）`
+        // 展示副本做词典级翻译（环境无 LLM key，translate.js 为离线术语词典）；
+        // 仅作用于展示副本，绝不改写存储的 it（分类/质量滤网依赖英文关键词，如 siemens energy→西门子能源会破坏分类）
+        const disp = translateItem(it);
+        // 显示标题：优先 LLM 生成的干净中文标题，否则翻译副本标题，否则清洗后的原标题
+        const rawTitle = it.headline_cn || cleanTitle(disp.title) || disp.title || '(无标题)';
+        const title = disp.originalTitle && disp.originalTitle !== disp.title
+          ? `${rawTitle}（原: ${disp.originalTitle}）`
           : rawTitle;
         const badge = it.importance ? `【${it.importance}】` : '';
         md += `**${badge}${i + 1}. ${title}**\n`;
@@ -296,17 +314,18 @@ function renderReport(period) {
         if (it.importance) meta.push(`重要性: ${it.importance}`);
         if (meta.length) md += `> ${meta.join(' | ')}\n`;
 
-        // 正文：优先 LLM 摘要（5W1H），回退抽取式
+        // 正文：优先 LLM 摘要（5W1H），回退翻译副本正文（词典级），再回退抽取式
         if (it.summary) {
           md += `${it.summary}\n`;
           if (it.why) md += `> 💡 ${it.why}\n`;
-        } else if (it.text) {
-          const text = it.text.slice(0, 600).replace(/\s+/g, ' ').trim();
-          md += `${text}… _[未LLM精修]_  \n`;
+        } else if (disp.text) {
+          const text = disp.text.slice(0, 600).replace(/\s+/g, ' ').trim();
+          const tag = disp.translated ? '_[🌐 术语已译]_' : '_[未LLM精修]_';
+          md += `${text}… ${tag}  \n`;
         }
 
         // 翻译标注
-        if (it.translated) md += `_[🌐 已翻译]_\n`;
+        if (disp.translated) md += `_[🌐 已翻译]_\n`;
 
         if (it.url) md += `[原文链接](${it.url})\n`;
         md += `\n`;
@@ -337,6 +356,26 @@ function renderReport(period) {
     const total = Object.values(structure[cat]).reduce((s, a) => s + a.length, 0);
     md += `| ${cat} | ${total} |\n`;
   }
+
+  // 信源覆盖度页脚：明示哪些权威/媒体源本日 0 产出（如 LinkedIn 未关注/限流），避免误以为漏采
+  try {
+    const statusPath = path.join(ROOT, 'daily_status.json');
+    if (fs.existsSync(statusPath)) {
+      const status = JSON.parse(fs.readFileSync(statusPath, 'utf8'));
+      const zeroSources = [];
+      for (const [k, v] of Object.entries(status.sources || {})) {
+        if (v && v.ok && v.collected === 0) zeroSources.push(k);
+      }
+      if (status.errors && status.errors.length) {
+        md += `\n> ⚠️ 本日采集异常/${zeroSources.length} 个信源 0 产出：` +
+          `${zeroSources.concat(status.errors).slice(0, 8).join('；')}。` +
+          `（LinkedIn 类 0 产出多为会话未关注该公司或被限流，属登录态依赖，非代码故障）\n`;
+      } else if (zeroSources.length) {
+        md += `\n> ℹ️ 本日 ${zeroSources.length} 个信源 0 产出：${zeroSources.slice(0, 8).join('；')}。` +
+          `（多为 LinkedIn 会话未关注/限流，非代码故障）\n`;
+      }
+    }
+  } catch (_) { /* 页脚非关键 */ }
 
   const dir = OUT_DIR[period];
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

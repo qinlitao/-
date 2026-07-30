@@ -130,6 +130,8 @@ async function collect(source) {
       await page.waitForTimeout(2000);
       posts = await scanPosts();
     }
+    // 无帖产出标记：会话未关注该公司/被限流时，让 run_daily 在报告页脚明示缺口（而非静默丢失覆盖度）
+    if (posts.length === 0) res0 = true;
 
     for (const p of posts) {
       // 优先用 <time datetime="..."> 属性（ISO 格式），保证 core.js 时间窗口过滤生效。
@@ -155,7 +157,7 @@ async function collect(source) {
     if (context) await context.close().catch(() => {});
     return { items, error: e.message };
   }
-  return { items };
+  return { items, zeroPosts: typeof res0 !== 'undefined' && res0 };
 }
 
 module.exports = { collect };
