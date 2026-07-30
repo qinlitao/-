@@ -434,4 +434,4 @@ async function collect(source) {
   return { items: [], error: `web adapter 不支持类型 ${source.type}` };
 }
 
-module.exports = { collect, parseRss, fetchWithRetry, httpGet, extractDateFromHtml, isNavCandidate, articleScore };
+module.exports = { collect, parseRss, fetchWithRetry, httpGet, extractDateFromHtml, isNavCandidate, articleScore, extractMainText };
