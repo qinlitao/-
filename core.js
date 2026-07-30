@@ -80,9 +80,12 @@ function isInWindow(dateStr, windowDays) {
   if (!d) return true; // 解析失败的保留
 
   const { year, month, day } = getShanghaiDate();
-  // 窗口起止：前 windowDays 天的 00:00:00 到 23:59:59
+  // 滚动窗口：保留 [今天-windowDays, 今天) 共 windowDays 整天（不含今天）。
+  // 兼容 windowDays=1 = 昨天；windowDays=14 = 最近 14 天。
+  // 旧实现 windowEnd = day - windowDays + 1，把"最近 N 天"错成"只保留 N 天前那 1 天"，
+  // 导致 press 源(windowDays=14)几乎全被 time-filtered 砍掉，日报燃机条目极少。
   const windowStart = new Date(year, month, day - windowDays, 0, 0, 0);
-  const windowEnd = new Date(year, month, day - windowDays + 1, 0, 0, 0);
+  const windowEnd = new Date(year, month, day, 0, 0, 0);
 
   return d >= windowStart && d < windowEnd;
 }
