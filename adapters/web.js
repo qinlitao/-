@@ -78,7 +78,7 @@ const UAS = [
  * 重试: 网络异常 / 429 / 5xx / 401·403(轮换 UA, 最多 3 次) / 空体(反爬空响应)
  * 不重试: 其他 4xx(视为客户端错误)
  */
-async function fetchWithRetry(url, { timeout = 20000, maxRetries = 20, method = 'GET' } = {}) {
+async function fetchWithRetry(url, { timeout = 15000, maxRetries = 4, method = 'GET' } = {}) {
   const waits = [3, 5, 8];
   let lastErr = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -101,9 +101,11 @@ async function fetchWithRetry(url, { timeout = 20000, maxRetries = 20, method = 
         }
       } else {
         const body = await resp.text();
-        // 空体(反爬空响应, 如 renewableenergymagazine 的 200 空体)当作失败重试, 触发 UA 轮换
+        // 空体(反爬空响应, 如 renewableenergymagazine 的 200 空体)触发 UA 轮换重试,
+        // 但最多 3 次后放弃, 避免每日运行对空体源长时挂起
         if (body.length < 50) {
-          lastErr = new Error(`empty body HTTP ${resp.status}`);
+          if (attempt < 4) { lastErr = new Error(`empty body HTTP ${resp.status}`); }
+          else { return { ok: false, status: resp.status, body: '', error: 'empty body' }; }
         } else {
           return { ok: true, status: resp.status, body };
         }
@@ -175,16 +177,20 @@ async function browserGet(url, { timeout = 30000 } = {}) {
   }
 }
 
-/** 三级兜底: fetchWithRetry → curl → 浏览器渲染(应对 Cloudflare 等反爬) */
-async function httpGet(url, opts) {
+/** 三级兜底: fetchWithRetry → curl → (可选)浏览器渲染(应对 Cloudflare 等反爬)
+ *  浏览器兜底默认关闭(每日运行追求速度); 仅对显式 opts.browser=true 的来源开启
+ *  (如 RSS 反爬源), 避免对每个失败信源都拉起 Playwright 导致严重超时。 */
+async function httpGet(url, opts = {}) {
   const r = await fetchWithRetry(url, opts);
   if (r.ok) return r;
   const c = curlFetch(url, (opts && opts.timeout) || 15000);
   if (c.ok && c.body.length > 100) return { ok: true, body: c.body, via: 'curl' };
-  try {
-    const b = await browserGet(url, { timeout: (opts && opts.timeout) || 30000 });
-    if (b.ok && b.body.length > 100) return { ok: true, body: b.body, via: 'browser' };
-  } catch (_) { /* 浏览器不可用(未装/代理异常)时静默降级 */ }
+  if (opts.browser) {
+    try {
+      const b = await browserGet(url, { timeout: (opts && opts.timeout) || 30000 });
+      if (b.ok && b.body.length > 100) return { ok: true, body: b.body, via: 'browser' };
+    } catch (_) { /* 浏览器不可用(未装/代理异常)时静默降级 */ }
+  }
   return r;
 }
 
@@ -362,7 +368,7 @@ async function collect(source) {
     if (!source.feed_url || source.feed_url.includes('<')) {
       return { items: [], skipped: true, reason: 'feed_url 未配置真实地址' };
     }
-    const r = await httpGet(source.feed_url);
+    const r = await httpGet(source.feed_url, { browser: true });
     let xml = r.ok ? r.body : '';
     if (!xml || xml.length < 100) {
       const c = curlFetch(source.feed_url);
