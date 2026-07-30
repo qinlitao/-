@@ -64,37 +64,54 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 /**
+ * UA 轮换表 — 部分站点 WAF 对显式 Chrome UA 反而返回 403,
+ * 而默认(无 UA)或 Firefox UA 可通过; 故优先默认 UA, 遇 401/403 轮换重试。
+ */
+const UAS = [
+  '',  // 默认(不发送 UA) — 多个 DataDome/Cloudflare 站点允许
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0'
+];
+
+/**
  * fetchWithRetry — 对齐云端 ops.py 重试时间表: 5s / 10s / 30s / 之后每 10s × (maxRetries-3)
- * 重试: 网络异常 / 429 / 5xx / 401·403(仅2次)
+ * 重试: 网络异常 / 429 / 5xx / 401·403(轮换 UA, 最多 3 次) / 空体(反爬空响应)
  * 不重试: 其他 4xx(视为客户端错误)
  */
 async function fetchWithRetry(url, { timeout = 20000, maxRetries = 20, method = 'GET' } = {}) {
-  const waits = [5, 10, 30];
+  const waits = [3, 5, 8];
   let lastErr = null;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const ua = UAS[(attempt - 1) % UAS.length];
+    const headers = { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+    if (ua) headers['User-Agent'] = ua;
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), timeout);
-      const resp = await fetch(url, { method, headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' }, signal: ctrl.signal });
+      const resp = await fetch(url, { method, headers, signal: ctrl.signal });
       clearTimeout(t);
       if (resp.status === 429 || resp.status >= 500) {
         lastErr = new Error(`HTTP ${resp.status}`);
       } else if (resp.status >= 400 && resp.status < 500) {
-        if ((resp.status === 401 || resp.status === 403) && attempt < 2) {
+        // 401/403 多为 UA 触发, 轮换 UA 重试(最多 3 次); 其余 4xx 视为客户端错误不重试
+        if ((resp.status === 401 || resp.status === 403) && attempt < 4) {
           lastErr = new Error(`HTTP ${resp.status}`);
         } else {
           return { ok: false, status: resp.status, body: '' };
         }
       } else {
         const body = await resp.text();
-        return { ok: true, status: resp.status, body };
+        // 空体(反爬空响应, 如 renewableenergymagazine 的 200 空体)当作失败重试, 触发 UA 轮换
+        if (body.length < 50) {
+          lastErr = new Error(`empty body HTTP ${resp.status}`);
+        } else {
+          return { ok: true, status: resp.status, body };
+        }
       }
     } catch (e) {
       lastErr = e;
     }
-    let w;
-    if (attempt <= 3) w = waits[attempt - 1];
-    else w = 10;
+    const w = attempt <= 3 ? waits[attempt - 1] : 10;
     await sleep(w * 1000);
   }
   return { ok: false, error: String((lastErr && lastErr.message) || 'max retries') };
@@ -102,7 +119,7 @@ async function fetchWithRetry(url, { timeout = 20000, maxRetries = 20, method = 
 
 function curlFetch(url, timeoutMs = 15000) {
   try {
-    const body = execFileSync('curl', ['-sL', '-A', UA, url], {
+    const body = execFileSync('curl', ['-sL', url], {
       timeout: timeoutMs, encoding: 'utf8', maxBuffer: 5 * 1024 * 1024
     });
     return { ok: true, body };
@@ -111,12 +128,63 @@ function curlFetch(url, timeoutMs = 15000) {
   }
 }
 
-/** 先 fetchWithRetry，失败再 curl 后备（应对 TLS 指纹/反爬）*/
+/** 检测系统/环境代理（沙箱直连 DNS 线程会崩溃, 浏览器需走代理解析）*/
+function detectProxy() {
+  const env = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy || process.env.GIT_PROXY;
+  if (env) return env;
+  if (process.platform === 'win32') {
+    try {
+      const en = execFileSync('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyEnable'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+      if (/ProxyEnable[\s\S]*0x1\b/.test(en)) {
+        const out = execFileSync('reg', ['query', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings', '/v', 'ProxyServer'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+        const m = out.match(/ProxyServer\s+REG_SZ\s+(.+)/);
+        if (m) {
+          let s = m[1].trim();
+          const https = s.match(/https=([^\s;]+)/);
+          const http = s.match(/http=([^\s;]+)/);
+          let host = (https || http || [, s])[1].trim();
+          if (host && !/^https?:\/\//.test(host)) host = 'http://' + host;
+          return host || null;
+        }
+      }
+    } catch (_) { /* 无代理或 reg 不可用 */ }
+  }
+  return null;
+}
+
+// 浏览器兜底(过 Cloudflare 等 JS 挑战) — 懒加载 playwright, 失败静默降级
+let _browser = null;
+async function getBrowser() {
+  if (_browser) return _browser;
+  const chromium = require('playwright').chromium;
+  const proxy = detectProxy();
+  const args = proxy ? [`--proxy-server=${proxy}`] : [];
+  _browser = await chromium.launch({ headless: true, args });
+  return _browser;
+}
+
+async function browserGet(url, { timeout = 30000 } = {}) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
+    const body = await page.content();
+    return { ok: true, status: resp ? resp.status() : 200, body };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+/** 三级兜底: fetchWithRetry → curl → 浏览器渲染(应对 Cloudflare 等反爬) */
 async function httpGet(url, opts) {
   const r = await fetchWithRetry(url, opts);
   if (r.ok) return r;
   const c = curlFetch(url, (opts && opts.timeout) || 15000);
   if (c.ok && c.body.length > 100) return { ok: true, body: c.body, via: 'curl' };
+  try {
+    const b = await browserGet(url, { timeout: (opts && opts.timeout) || 30000 });
+    if (b.ok && b.body.length > 100) return { ok: true, body: b.body, via: 'browser' };
+  } catch (_) { /* 浏览器不可用(未装/代理异常)时静默降级 */ }
   return r;
 }
 
@@ -315,4 +383,4 @@ async function collect(source) {
   return { items: [], error: `web adapter 不支持类型 ${source.type}` };
 }
 
-module.exports = { collect, parseRss, fetchWithRetry, extractDateFromHtml, isNavCandidate, articleScore };
+module.exports = { collect, parseRss, fetchWithRetry, httpGet, extractDateFromHtml, isNavCandidate, articleScore };

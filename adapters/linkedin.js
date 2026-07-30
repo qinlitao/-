@@ -69,7 +69,8 @@ async function collect(source) {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(1500);
 
-    const posts = await page.evaluate(() => {
+    // 抽取帖子（独立函数，便于空结果时重试）
+    const scanPosts = () => page.evaluate(() => {
       const results = [];
       const cards = document.querySelectorAll('div[role="article"], .feed-shared-update-v2, .update-components-actor');
       const seen = new Set();
@@ -117,6 +118,18 @@ async function collect(source) {
       });
       return results;
     });
+
+    let posts = await scanPosts();
+    // 空结果重试: 部分公司页帖子为懒加载, 初次扫描可能为空; 多滚几屏再扫一次
+    if (posts.length === 0) {
+      for (let i = 0; i < 8; i++) {
+        await page.evaluate(() => window.scrollBy(0, 1400));
+        await page.waitForTimeout(2000);
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.waitForTimeout(2000);
+      posts = await scanPosts();
+    }
 
     for (const p of posts) {
       // 优先用 <time datetime="..."> 属性（ISO 格式），保证 core.js 时间窗口过滤生效。
