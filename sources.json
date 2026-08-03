@@ -197,7 +197,7 @@
       "strict": true,
       "category": "能源",
       "windowDays": 1,
-      "_note": "可再生能源杂志。质量滤网会剔除纯光伏/风电噪音。"
+      "_note": "可再生能源杂志。WAF 反爬(Cloudflare/DataDome 类)，bot 直连 /feed/ 返回 200 空体；生产采集已用 httpGet({browser:true}) 浏览器兜底(健康巡检因不含浏览器兜底而标'非RSS 空体'，非死链)。WebSearch 未找到可用替代 feed。质量滤网会剔除纯光伏/风电噪音。"
     },
     {
       "name": "MIT Sloan Management Review",
