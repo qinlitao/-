@@ -190,14 +190,20 @@
     },
     {
       "name": "Renewable Energy Magazine",
-      "platform": "rss",
-      "type": "rss",
-      "feed_url": "https://www.renewableenergymagazine.com/feed/",
+      "platform": "press",
+      "type": "press",
+      "url": "https://www.renewableenergymagazine.com/panorama",
+      "domains": [
+        "renewableenergymagazine.com"
+      ],
+      "url_allow_path": [
+        "/panorama/"
+      ],
       "default_tz": "Europe/London",
       "strict": true,
       "category": "能源",
-      "windowDays": 1,
-      "_note": "可再生能源杂志。WAF 反爬(Cloudflare/DataDome 类)，bot 直连 /feed/ 返回 200 空体；生产采集已用 httpGet({browser:true}) 浏览器兜底(健康巡检因不含浏览器兜底而标'非RSS 空体'，非死链)。WebSearch 未找到可用替代 feed。质量滤网会剔除纯光伏/风电噪音。"
+      "windowDays": 14,
+      "_note": "可再生能源杂志。2026-08-18 修正：原 rss /feed/ 已被站点下线(非反爬——首页返回 92KB 正常，而 /feed/ 与任意不存在路径同样返回 HTTP 200+空体，即该站 404 错误页返回 200)；首页已无任何 rel=alternate RSS 声明，官方 2011 年公告的替代地址 energias-renovables.com/publico/RSS/len/en 亦同样 200 空体失效。故改为 press 直连新闻栏目 /panorama(文章 URL 尾部带 YYYYMMDD，可被 parseUrlDate 解析)。windowDays 依 press 语义设 14(栏目约每 2-3 天 1 篇，设 1 会被 time-filter 全砍)。不设 press:true，保留质量滤网剔除纯光伏/风电噪音。"
     },
     {
       "name": "MIT Sloan Management Review",
@@ -208,7 +214,7 @@
       "strict": true,
       "category": "战略管理",
       "tier": 2,
-      "_note": "MIT斯隆管理评论"
+      "_note": "MIT斯隆管理评论。feed_url 正确无需改动(WordPress 标准 /feed/，第三方抓取可取到有效 RSS)。2026-08-18 巡检：站点已启用 Cloudflare 全域人机校验——首页/栏目页/所有 feed 路径(/feed、/rss、/topic/*/feed/、/tag/*/feed/)一律返回 403 'Just a moment...' 挑战页，curl 层再被 nginx 403(即报告中 bodyLen=146)；fetchWithRetry(UA 轮换) 与 httpGet({browser:true}) 本地均无法过挑战。同域无可用替代 feed(全部同样 403)，故标记为待浏览器渲染(反爬)，非死链，勿改 URL。"
     },
     {
       "name": "北极星电力网",
